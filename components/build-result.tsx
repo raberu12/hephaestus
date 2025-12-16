@@ -6,28 +6,13 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { ChevronDown, ChevronUp, Download, RotateCcw, Info, Cpu, Monitor, CircuitBoard, MemoryStick, HardDrive, Power, Box, Fan, Recycle, ExternalLink } from "lucide-react"
 import { useState } from "react"
-import type { PCComponent, ComponentType } from "@/lib/types"
+import { COMPONENT_LABELS, type PCComponent, type ComponentType, type ComponentReasoning } from "@/lib/types"
 
 interface BuildResultProps {
   build: Record<ComponentType, PCComponent>
   reusedParts: ComponentType[]
-  reasoning: {
-    overall: string
-    componentExplanations: Record<string, string>
-    tradeOffs?: string
-  }
+  reasoning: ComponentReasoning
   onReset: () => void
-}
-
-const COMPONENT_LABELS: Record<ComponentType, string> = {
-  cpu: "CPU",
-  gpu: "GPU",
-  motherboard: "Motherboard",
-  ram: "RAM",
-  storage: "Storage",
-  psu: "PSU",
-  case: "Case",
-  cooler: "Cooler",
 }
 
 const COMPONENT_ICONS: Record<ComponentType, React.ReactNode> = {
@@ -198,10 +183,10 @@ Note: Prices are based on current Philippine retailer listings and may vary.
               {expandedComponents.has(type) && (
                 <div className="p-4 pt-0 border-t bg-muted/30 space-y-4">
                   <div className="text-sm leading-relaxed">{reasoning.componentExplanations[type]}</div>
-                  {(component as any).links && (component as any).links.length > 0 && (
+                  {component.links && component.links.length > 0 && (
                     <div className="flex flex-wrap gap-2">
                       <span className="text-xs text-muted-foreground">Shop:</span>
-                      {(component as any).links.map((link: { store: string; url: string }, idx: number) => (
+                      {component.links.map((link, idx) => (
                         <a
                           key={idx}
                           href={link.url}
