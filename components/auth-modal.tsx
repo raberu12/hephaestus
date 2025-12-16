@@ -162,7 +162,7 @@ export default function AuthModal({ open, onOpenChange, onSuccess }: AuthModalPr
                                     "Sign In"
                                 )}
                             </Button>
-                            <p className="text-xs text-center text-muted-foreground">
+                            <p className="text-xs text-center text-muted-foreground mt-3 pt-3 border-t">
                                 Wrong username or password? Check your credentials and try again.
                             </p>
                         </form>
