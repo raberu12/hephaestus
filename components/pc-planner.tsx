@@ -73,12 +73,14 @@ export default function PCPlanner() {
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-6 py-12 max-w-[1400px]">
-        <div className="mb-12 text-center space-y-3">
-          <h1 className="text-4xl font-bold text-balance leading-tight heading-gradient">Forge Your Perfect Build</h1>
-          <p className="text-muted-foreground text-lg text-pretty leading-relaxed max-w-2xl mx-auto">
-            Answer a few questions and get a personalized PC build recommendation with AI-powered reasoning
-          </p>
-        </div>
+        {appState !== "result" && (
+          <div className="mb-12 text-center space-y-3">
+            <h1 className="text-4xl font-bold text-balance leading-tight heading-gradient">Forge Your Perfect Build</h1>
+            <p className="text-muted-foreground text-lg text-pretty leading-relaxed max-w-2xl mx-auto">
+              Answer a few questions and get a personalized PC build recommendation with AI-powered reasoning
+            </p>
+          </div>
+        )}
 
         {appState === "quiz" && <QuizForm onComplete={handleQuizComplete} />}
 
