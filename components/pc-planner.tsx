@@ -4,7 +4,8 @@ import { useState } from "react"
 import QuizForm from "./quiz-form"
 import BuildResult from "./build-result"
 import Loader from "./loader"
-import type { QuizAnswers, PCComponent, ComponentType } from "@/lib/types"
+import { toast } from "sonner"
+import type { QuizAnswers, RecommendationResponse } from "@/lib/types"
 
 type AppState = "quiz" | "loading" | "result"
 
@@ -13,13 +14,9 @@ const MAX_RETRIES = 3
 export default function PCPlanner() {
   const [appState, setAppState] = useState<AppState>("quiz")
   const [retryCount, setRetryCount] = useState(0)
-  const [recommendedBuild, setRecommendedBuild] = useState<{
-    build: Record<ComponentType, PCComponent>
-    reusedParts?: ComponentType[]
-    reasoning: any
-  } | null>(null)
+  const [recommendedBuild, setRecommendedBuild] = useState<RecommendationResponse | null>(null)
 
-  const fetchRecommendation = async (answers: QuizAnswers, attempt: number = 1): Promise<any> => {
+  const fetchRecommendation = async (answers: QuizAnswers, attempt: number = 1): Promise<RecommendationResponse> => {
     setRetryCount(attempt)
 
     try {
@@ -60,7 +57,7 @@ export default function PCPlanner() {
       setAppState("result")
     } catch (error) {
       console.error("Failed to generate build:", error)
-      alert("Failed to generate build recommendation after multiple attempts. Please try again.")
+      toast.error("Failed to generate build recommendation after multiple attempts. Please try again.")
       setAppState("quiz")
     } finally {
       setRetryCount(0)
