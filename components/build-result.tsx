@@ -4,12 +4,13 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { ChevronDown, ChevronUp, Download, RotateCcw, Info } from "lucide-react"
+import { ChevronDown, ChevronUp, Download, RotateCcw, Info, Cpu, Monitor, CircuitBoard, MemoryStick, HardDrive, Power, Box, Fan, Recycle, ExternalLink } from "lucide-react"
 import { useState } from "react"
 import type { PCComponent, ComponentType } from "@/lib/types"
 
 interface BuildResultProps {
   build: Record<ComponentType, PCComponent>
+  reusedParts: ComponentType[]
   reasoning: {
     overall: string
     componentExplanations: Record<string, string>
@@ -29,10 +30,33 @@ const COMPONENT_LABELS: Record<ComponentType, string> = {
   cooler: "Cooler",
 }
 
-export default function BuildResult({ build, reasoning, onReset }: BuildResultProps) {
-  const [expandedComponent, setExpandedComponent] = useState<ComponentType | null>(null)
+const COMPONENT_ICONS: Record<ComponentType, React.ReactNode> = {
+  cpu: <Cpu className="w-6 h-6 text-primary" />,
+  gpu: <Monitor className="w-6 h-6 text-primary" />,
+  motherboard: <CircuitBoard className="w-6 h-6 text-primary" />,
+  ram: <MemoryStick className="w-6 h-6 text-primary" />,
+  storage: <HardDrive className="w-6 h-6 text-primary" />,
+  psu: <Power className="w-6 h-6 text-primary" />,
+  case: <Box className="w-6 h-6 text-primary" />,
+  cooler: <Fan className="w-6 h-6 text-primary" />,
+}
 
-  // Prices from live search are already in PHP
+export default function BuildResult({ build, reusedParts, reasoning, onReset }: BuildResultProps) {
+  const [expandedComponents, setExpandedComponents] = useState<Set<ComponentType>>(new Set())
+
+  const toggleComponent = (type: ComponentType) => {
+    setExpandedComponents((prev) => {
+      const newSet = new Set(prev)
+      if (newSet.has(type)) {
+        newSet.delete(type)
+      } else {
+        newSet.add(type)
+      }
+      return newSet
+    })
+  }
+
+  // Prices from live search are already in PHP (reused parts have no cost)
   const totalPrice = Object.values(build).reduce((sum, component) => sum + (component?.price || 0), 0)
   const totalWattage = Object.values(build).reduce((sum, component) => sum + (component?.wattage || 0), 0)
 
@@ -98,21 +122,63 @@ Note: Prices are based on current Philippine retailer listings and may vary.
 
         <Separator />
 
+        {/* Reused Parts Section */}
+        {reusedParts.length > 0 && (
+          <>
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                <Recycle className="w-4 h-4" />
+                Reusing from Existing Build
+              </h3>
+              {reusedParts.map((type) => (
+                <div key={type} className="border border-dashed rounded-lg p-4 bg-muted/20">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-md bg-green-500/10 flex items-center justify-center flex-shrink-0">
+                      {COMPONENT_ICONS[type]}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3">
+                        <Badge variant="outline" className="text-xs font-semibold">
+                          {COMPONENT_LABELS[type]}
+                        </Badge>
+                        <Badge className="bg-green-500/20 text-green-600 border-green-500/30 text-xs">
+                          Reusing
+                        </Badge>
+                      </div>
+                      <div className="text-sm text-muted-foreground mt-1">Using your existing {COMPONENT_LABELS[type].toLowerCase()}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-bold text-lg text-green-600">₱0</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <Separator />
+          </>
+        )}
+
+        {/* New Components Section */}
         <div className="space-y-3">
           {(Object.entries(build) as [ComponentType, PCComponent][]).map(([type, component]) => (
             <div key={type} className="border rounded-lg overflow-hidden">
               <button
-                onClick={() => setExpandedComponent(expandedComponent === type ? null : type)}
+                onClick={() => toggleComponent(type)}
                 className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors text-left"
               >
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <Badge variant="outline" className="text-xs font-semibold">
-                      {COMPONENT_LABELS[type]}
-                    </Badge>
-                    <span className="font-bold">{component.name}</span>
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    {COMPONENT_ICONS[type]}
                   </div>
-                  <div className="text-sm text-muted-foreground">{component.specs}</div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <Badge variant="outline" className="text-xs font-semibold">
+                        {COMPONENT_LABELS[type]}
+                      </Badge>
+                      <span className="font-bold">{component.name}</span>
+                    </div>
+                    <div className="text-sm text-muted-foreground">{component.specs}</div>
+                  </div>
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="text-right">
@@ -121,7 +187,7 @@ Note: Prices are based on current Philippine retailer listings and may vary.
                       {component.price.toLocaleString()}
                     </div>
                   </div>
-                  {expandedComponent === type ? (
+                  {expandedComponents.has(type) ? (
                     <ChevronUp className="w-5 h-5 text-muted-foreground" />
                   ) : (
                     <ChevronDown className="w-5 h-5 text-muted-foreground" />
@@ -129,9 +195,26 @@ Note: Prices are based on current Philippine retailer listings and may vary.
                 </div>
               </button>
 
-              {expandedComponent === type && (
-                <div className="p-4 pt-0 border-t bg-muted/30">
+              {expandedComponents.has(type) && (
+                <div className="p-4 pt-0 border-t bg-muted/30 space-y-4">
                   <div className="text-sm leading-relaxed">{reasoning.componentExplanations[type]}</div>
+                  {(component as any).links && (component as any).links.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      <span className="text-xs text-muted-foreground">Shop:</span>
+                      {(component as any).links.map((link: { store: string; url: string }, idx: number) => (
+                        <a
+                          key={idx}
+                          href={link.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                        >
+                          {link.store}
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
