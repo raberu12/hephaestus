@@ -44,12 +44,13 @@ function ChoiceCard({ value, label, description, icon: Icon, isSelected, onClick
       className={`
         relative p-6 rounded-lg border-2 transition-all duration-200 text-left
         hover:border-primary/50 hover:bg-primary/5
+        card-hover btn-press
         ${isSelected ? "border-primary bg-primary/10" : "border-border bg-card"}
       `}
     >
       <div className="space-y-3">
-        <div className={`inline-flex p-3 rounded-lg ${isSelected ? "bg-primary/20" : "bg-muted"}`}>
-          <Icon className={`w-6 h-6 ${isSelected ? "text-primary" : "text-muted-foreground"}`} />
+        <div className={`inline-flex p-3 rounded-lg transition-all duration-200 ${isSelected ? "bg-primary/20" : "bg-muted"}`}>
+          <Icon className={`w-6 h-6 transition-all duration-200 ${isSelected ? "text-primary" : "text-muted-foreground"}`} />
         </div>
         <div>
           <div className="font-semibold text-lg mb-1">{label}</div>
@@ -57,7 +58,7 @@ function ChoiceCard({ value, label, description, icon: Icon, isSelected, onClick
         </div>
       </div>
       {isSelected && (
-        <div className="absolute top-3 right-3">
+        <div className="absolute top-3 right-3 animate-check-pop">
           <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
             <svg className="w-4 h-4 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />

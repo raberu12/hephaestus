@@ -146,8 +146,8 @@ Note: Prices are based on current Philippine retailer listings and may vary.
 
         {/* New Components Section */}
         <div className="space-y-3">
-          {(Object.entries(build) as [ComponentType, PCComponent][]).map(([type, component]) => (
-            <div key={type} className="border rounded-lg overflow-hidden">
+          {(Object.entries(build) as [ComponentType, PCComponent][]).map(([type, component], index) => (
+            <div key={type} className={`border rounded-lg overflow-hidden card-hover animate-slide-up stagger-${index + 1}`} style={{ opacity: 0 }}>
               <button
                 onClick={() => toggleComponent(type)}
                 className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors text-left"
@@ -182,7 +182,7 @@ Note: Prices are based on current Philippine retailer listings and may vary.
               </button>
 
               {expandedComponents.has(type) && (
-                <div className="p-4 pt-0 border-t bg-muted/30 space-y-4">
+                <div className="p-4 pt-0 border-t bg-muted/30 space-y-4 animate-slide-down">
                   <div className="text-sm leading-relaxed">{reasoning.componentExplanations[type]}</div>
                   {component.links && component.links.length > 0 && (
                     <div className="flex flex-wrap gap-2">
