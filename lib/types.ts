@@ -82,3 +82,19 @@ export const COMPONENT_LABELS: Record<ComponentType, string> = {
   cooler: "Cooler",
   monitor: "Monitor",
 }
+
+// ============================================
+// Saved Build Types
+// ============================================
+
+export interface SavedBuild {
+  id: string
+  user_id: string
+  name: string
+  build: Record<ComponentType, PCComponent>
+  reused_parts: ComponentType[]
+  reasoning: ComponentReasoning
+  total_price: number
+  created_at: string
+}
+
