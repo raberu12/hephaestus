@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { ChevronDown, ChevronUp, Download, RotateCcw, Info, Cpu, Monitor, CircuitBoard, MemoryStick, HardDrive, Power, Box, Fan, Recycle, ExternalLink } from "lucide-react"
+import { ChevronDown, ChevronUp, Download, RotateCcw, Info, Cpu, Monitor, CircuitBoard, MemoryStick, HardDrive, Power, Box, Fan, Recycle, ExternalLink, Tv } from "lucide-react"
 import { useState } from "react"
 import { COMPONENT_LABELS, type PCComponent, type ComponentType, type ComponentReasoning } from "@/lib/types"
 
@@ -24,6 +24,7 @@ const COMPONENT_ICONS: Record<ComponentType, React.ReactNode> = {
   psu: <Power className="w-6 h-6 text-primary" />,
   case: <Box className="w-6 h-6 text-primary" />,
   cooler: <Fan className="w-6 h-6 text-primary" />,
+  monitor: <Tv className="w-6 h-6 text-primary" />,
 }
 
 export default function BuildResult({ build, reusedParts, reasoning, onReset }: BuildResultProps) {

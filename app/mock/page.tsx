@@ -101,6 +101,18 @@ const mockBuild: Record<ComponentType, PCComponent & { links?: { store: string; 
             { store: "PC Hub", url: "https://pchub.com" },
         ],
     },
+    monitor: {
+        id: "monitor-mock",
+        name: "ASUS VG249Q1A 24\" 165Hz",
+        type: "monitor",
+        price: 8995,
+        specs: "24\" IPS, 1080p, 165Hz, 1ms, FreeSync",
+        wattage: 25,
+        links: [
+            { store: "Lazada", url: "https://www.lazada.com.ph" },
+            { store: "PC Hub", url: "https://pchub.com" },
+        ],
+    },
 }
 
 const mockReasoning = {

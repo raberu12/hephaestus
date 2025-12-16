@@ -4,7 +4,7 @@ An AI-powered PC build recommendation tool for the Philippines. Answer a few que
 
 ## Features
 
-- **AI-Powered Recommendations** - Uses Google Gemini with search grounding to find current prices from Philippine retailers (Lazada, Shopee, PC Hub, DynaQuest, etc.)
+- **AI-Powered Recommendations** - Uses OpenRouter with Gemini 2.0 Flash to find current prices from Philippine retailers (Lazada, Shopee, PC Hub, DynaQuest, etc.)
 - **Budget-Aware** - Strict budget adherence with intelligent component selection
 - **Reuse Existing Parts** - Mark components you already own to exclude them from recommendations
 - **Shopping Links** - Direct links to purchase components from local stores
@@ -13,7 +13,7 @@ An AI-powered PC build recommendation tool for the Philippines. Answer a few que
 ## Tech Stack
 
 - **Framework**: Next.js 15 (App Router)
-- **AI**: Google Gemini 2.5 Flash with Search Grounding
+- **AI**: OpenRouter (google/gemini-2.0-flash-001)
 - **UI**: shadcn/ui + Tailwind CSS
 - **Language**: TypeScript
 
@@ -22,7 +22,7 @@ An AI-powered PC build recommendation tool for the Philippines. Answer a few que
 ### Prerequisites
 
 - Node.js 18+
-- Google AI API Key ([Get one here](https://aistudio.google.com/app/apikey))
+- OpenRouter API Key ([Get one here](https://openrouter.ai/keys))
 
 ### Installation
 
@@ -38,10 +38,10 @@ npm install
 cp .env.example .env.local
 ```
 
-Add your Google AI API key to `.env.local`:
+Add your OpenRouter API key to `.env.local`:
 
 ```env
-GOOGLE_GENERATIVE_AI_API_KEY=your_api_key_here
+OPENROUTER_API_KEY=your_api_key_here
 ```
 
 ### Development

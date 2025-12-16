@@ -2,7 +2,7 @@
 // Component Types
 // ============================================
 
-export type ComponentType = "cpu" | "gpu" | "motherboard" | "ram" | "storage" | "psu" | "case" | "cooler"
+export type ComponentType = "cpu" | "gpu" | "motherboard" | "ram" | "storage" | "psu" | "case" | "cooler" | "monitor"
 
 // Shopping link for a component
 export interface ShoppingLink {
@@ -68,6 +68,7 @@ export const COMPONENT_TYPES: { value: ComponentType; label: string; minSpec?: s
   { value: "psu", label: "PSU (Power Supply)" },
   { value: "case", label: "Case" },
   { value: "cooler", label: "CPU Cooler" },
+  { value: "monitor", label: "Monitor" },
 ]
 
 export const COMPONENT_LABELS: Record<ComponentType, string> = {
@@ -79,4 +80,5 @@ export const COMPONENT_LABELS: Record<ComponentType, string> = {
   psu: "PSU",
   case: "Case",
   cooler: "Cooler",
+  monitor: "Monitor",
 }

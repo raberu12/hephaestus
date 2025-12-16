@@ -1,11 +1,45 @@
-import { google } from "@ai-sdk/google"
+import { createOpenRouter } from "@openrouter/ai-sdk-provider"
 import { generateText } from "ai"
-import { COMPONENT_TYPES, type QuizAnswers, type ComponentType, type PCComponent } from "@/lib/types"
+import { COMPONENT_TYPES, type QuizAnswers, type ComponentType } from "@/lib/types"
 
-export const maxDuration = 60 // Increased for web search
+export const maxDuration = 60
 
 interface RecommendRequest {
   answers: QuizAnswers
+}
+
+// Initialize OpenRouter with API key
+const openrouter = createOpenRouter({
+  apiKey: process.env.OPENROUTER_API_KEY,
+})
+
+// Generate search URLs for Philippine retailers
+function generateShopLinks(productName: string): { store: string; url: string }[] {
+  const encodedName = encodeURIComponent(productName)
+  return [
+    { store: "Lazada", url: `https://www.lazada.com.ph/catalog/?q=${encodedName}` },
+    { store: "Shopee", url: `https://shopee.ph/search?keyword=${encodedName}` },
+  ]
+}
+
+// Determine which components to include based on use case
+function getComponentsForUseCase(
+  primaryUse: string,
+  reusedParts: ComponentType[]
+): { value: ComponentType; label: string; minSpec?: string }[] {
+  // For productivity, we might not need a discrete GPU (APU handles it)
+  const isProductivity = primaryUse === "productivity"
+
+  // Filter components based on use case
+  return COMPONENT_TYPES.filter((comp) => {
+    // Skip reused parts
+    if (reusedParts.includes(comp.value)) return false
+
+    // For productivity, skip GPU (recommend APU instead in CPU selection)
+    if (isProductivity && comp.value === "gpu") return false
+
+    return true
+  })
 }
 
 export async function POST(req: Request) {
@@ -14,11 +48,11 @@ export async function POST(req: Request) {
 
     const budgetPhp = answers.budget
     const reusedParts = answers.existingParts || []
+    const isProductivity = answers.primaryUse === "productivity"
+    const isGaming = answers.primaryUse === "gaming"
 
-    // Filter out components that are being reused
-    const componentsToSearch = COMPONENT_TYPES.filter(
-      (comp) => !reusedParts.includes(comp.value)
-    )
+    // Get components based on use case
+    const componentsToSearch = getComponentsForUseCase(answers.primaryUse, reusedParts)
 
     // If all components are reused, return empty build
     if (componentsToSearch.length === 0) {
@@ -37,57 +71,158 @@ export async function POST(req: Request) {
       .map((c, i) => `${i + 1}. ${c.label}${c.minSpec ? ` - ${c.minSpec}` : ""}`)
       .join("\n")
 
-    // Build JSON template for components to search (includes shopping links)
+    // Build JSON template for components (NO links - we generate those ourselves)
     const componentJsonTemplate = componentsToSearch
-      .map((c) => `    "${c.value}": { "name": "full product name", "price": 12345, "specs": "brief specs", "wattage": 65, "links": [{"store": "Lazada", "url": "https://..."}, {"store": "Shopee", "url": "https://..."}] }`)
+      .map((c) => `    "${c.value}": { "name": "full product name", "price": 12345, "specs": "brief specs", "wattage": 65 }`)
       .join(",\n")
 
     const notesJsonTemplate = componentsToSearch
       .map((c) => `    "${c.value}": "why this ${c.label}"`)
-      .join("\n")
+      .join(",\n")
 
-    const prompt = `You are a PC building expert helping someone in the Philippines. Search for current PC component prices from Philippine retailers (Lazada, Shopee, PC Hub, DynaQuest, ITWorld, EasyPC, etc.).
+    // Build use-case specific instructions
+    let useCaseInstructions = ""
+    if (isProductivity) {
+      useCaseInstructions = `
+USE CASE: PRODUCTIVITY
+- NO discrete GPU required. Select an APU (CPU with integrated graphics).
+- CPU MUST be an APU: AMD Ryzen 5600G, 5700G, 8600G, or 8700G series.
+- Prioritize: CPU cores > RAM capacity > Storage speed.`
+    } else if (isGaming) {
+      useCaseInstructions = `
+USE CASE: GAMING
+- Discrete GPU is MANDATORY - allocate 40-50% of total budget to GPU.
+- GPU is the highest priority component.
+- Prioritize: GPU > CPU > RAM > Storage.
+- Avoid CPU bottlenecks - pair appropriately with GPU tier.`
+    } else {
+      useCaseInstructions = `
+USE CASE: ${answers.primaryUse.toUpperCase()}
+- Include a discrete GPU for content creation/mixed workloads.
+- Balance all components appropriately for the use case.`
+    }
 
-BUILD REQUIREMENTS:
-- STRICT BUDGET: ₱${budgetPhp.toLocaleString()} PHP - Total MUST NOT exceed this
-- Primary Use: ${answers.primaryUse}
-- Performance Priority: ${answers.performancePriority}
-- Target: ${answers.targetResolution} @ ${answers.refreshRateGoal}
-- CPU Preference: ${answers.brandPreferences.cpu === "any" ? "No preference" : answers.brandPreferences.cpu}
-- GPU Preference: ${answers.brandPreferences.gpu === "any" ? "No preference" : answers.brandPreferences.gpu}
-${reusedParts.length > 0 ? `\nNOTE: User is REUSING these components: ${reusedParts.join(", ")}. Do NOT include them.` : ""}
+    // Calculate budget targets based on performance priority
+    const budgetMin = Math.round(budgetPhp * 0.98)
+    const budgetMax = budgetPhp
+    const balancedMin = Math.round(budgetPhp * 0.75)
+    const balancedMax = Math.round(budgetPhp * 0.90)
+    const valueMin = Math.round(budgetPhp * 0.50)
+    const valueMax = Math.round(budgetPhp * 0.75)
 
-Search for CURRENT Philippine prices and recommend ONE component for each:
+    // Build performance priority instructions
+    let performancePriorityInstructions = ""
+    if (answers.performancePriority === "max-performance") {
+      performancePriorityInstructions = `
+PERFORMANCE PRIORITY: MAXIMUM PERFORMANCE [HIGHEST PRIORITY]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+BUDGET TARGET: ₱${budgetMin.toLocaleString()} - ₱${budgetMax.toLocaleString()} (98-100% of budget)
+ACCEPTABLE VARIANCE: ±2% MAXIMUM
+
+MANDATORY RULES:
+1. USE THE FULL BUDGET. Underspending is a FAILURE condition.
+2. Select the HIGHEST TIER components that fit the budget.
+3. Performance takes absolute priority over cost savings.
+4. If budget allows a better component, you MUST select it.
+5. Do NOT select cheaper alternatives to "save money."
+6. Diminishing returns are ACCEPTABLE in this mode.
+
+FAILURE CONDITIONS:
+- Total below ₱${budgetMin.toLocaleString()} without technical justification.
+- Selecting mid-tier when high-tier fits budget.
+- Suggesting "value" alternatives.`
+    } else if (answers.performancePriority === "value") {
+      performancePriorityInstructions = `
+PERFORMANCE PRIORITY: BEST VALUE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+BUDGET TARGET: ₱${valueMin.toLocaleString()} - ₱${valueMax.toLocaleString()} (50-75% of budget)
+
+MANDATORY RULES:
+1. Optimize for price-to-performance ratio.
+2. Select components with best value, NOT highest tier.
+3. Underspending is EXPECTED and encouraged.
+4. Avoid diminishing returns - stay in value sweet spot.
+5. Total CAN be significantly under budget if value is optimal.`
+    } else {
+      performancePriorityInstructions = `
+PERFORMANCE PRIORITY: BALANCED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+BUDGET TARGET: ₱${balancedMin.toLocaleString()} - ₱${balancedMax.toLocaleString()} (75-90% of budget)
+
+MANDATORY RULES:
+1. Balance performance and value.
+2. Select solid mid-to-high tier components.
+3. Avoid both extremes: not cheapest, not most expensive.
+4. Leave reasonable headroom but don't sacrifice performance.`
+    }
+
+    const prompt = `You are a PC component recommendation system. You MUST follow ALL rules below with zero deviation.
+
+═══════════════════════════════════════════════════════════════
+SYSTEM RULES (MANDATORY - NO EXCEPTIONS)
+═══════════════════════════════════════════════════════════════
+
+RULE 1: QUIZ RESULTS ARE AUTHORITATIVE
+- All selections below are from user's quiz. They are BINDING.
+- You CANNOT override, reinterpret, or deviate from these inputs.
+- No assumptions. No defaults. No heuristics. Only quiz data.
+
+RULE 2: BUDGET IS A HARD CONSTRAINT
+- Maximum Budget: ₱${budgetPhp.toLocaleString()} PHP
+- You MUST NOT exceed this amount under any circumstance.
+- Underspending rules depend on Performance Priority (see below).
+
+RULE 3: NO UNSOLICITED COST SAVINGS
+- Do NOT suggest "saving money" unless user selected "Best Value."
+- Do NOT downgrade components to appear "reasonable" or "safe."
+- If budget allows better, you MUST recommend better.
+
+RULE 4: TRANSPARENCY REQUIRED
+- If exact budget matching is impossible, state the exact variance.
+- State any technical limitations preventing optimal selection.
+- No hedging language. Be precise and declarative.
+
+═══════════════════════════════════════════════════════════════
+USER'S QUIZ SELECTIONS (BINDING)
+═══════════════════════════════════════════════════════════════
+
+BUDGET: ₱${budgetPhp.toLocaleString()} PHP
+PRIMARY USE: ${answers.primaryUse}
+PERFORMANCE PRIORITY: ${answers.performancePriority}
+TARGET DISPLAY: ${answers.targetResolution} @ ${answers.refreshRateGoal}
+CPU BRAND: ${answers.brandPreferences.cpu === "any" ? "No preference" : answers.brandPreferences.cpu.toUpperCase()}
+GPU BRAND: ${answers.brandPreferences.gpu === "any" ? "No preference" : answers.brandPreferences.gpu.toUpperCase()}
+${reusedParts.length > 0 ? `REUSING: ${reusedParts.join(", ").toUpperCase()} (EXCLUDE from recommendations)` : ""}
+
+${useCaseInstructions}
+${performancePriorityInstructions}
+
+═══════════════════════════════════════════════════════════════
+COMPONENTS TO RECOMMEND (Philippine Market Prices in PHP)
+═══════════════════════════════════════════════════════════════
+
 ${componentList}
 
-IMPORTANT:
-- Find real prices from Philippine stores
-- Total of all ${componentsToSearch.length} components MUST be under ₱${budgetPhp.toLocaleString()}
-- Pick value-oriented parts that fit the budget
-- Include specific model names and prices you found
-- Include at least 2 real shopping links per component (from Lazada, Shopee, PC Hub, etc.)
+═══════════════════════════════════════════════════════════════
+OUTPUT FORMAT (STRICT JSON - NO MARKDOWN, NO EXPLANATION)
+═══════════════════════════════════════════════════════════════
 
-Return ONLY valid JSON in this exact format:
 {
   "components": {
 ${componentJsonTemplate}
   },
   "totalPrice": 12345,
-  "reasoning": "Exactly 2 brief sentences summarizing the build philosophy.",
+  "reasoning": "Two sentences only. State what was built and how budget was utilized.",
   "notes": {
 ${notesJsonTemplate}
   }
 }`
 
+    // Use OpenRouter with a FREE model
     const { text } = await generateText({
-      model: google("gemini-2.5-flash"),
+      model: openrouter("google/gemini-2.0-flash-001"),
       prompt,
       temperature: 0.3,
-      providerOptions: {
-        google: {
-          useSearchGrounding: true,
-        },
-      },
     })
 
     // Parse the AI response
@@ -98,20 +233,22 @@ ${notesJsonTemplate}
 
     const recommendation = JSON.parse(jsonMatch[0])
 
-    // Transform to expected format
-    const build: Record<ComponentType, { id: string; name: string; type: ComponentType; price: number; specs: string; wattage: number; links?: { store: string; url: string }[] }> = {} as any
+    // Transform to expected format and add generated shop links
+    const build: Record<ComponentType, { id: string; name: string; type: ComponentType; price: number; specs: string; wattage: number; links: { store: string; url: string }[] }> = {} as any
 
     componentsToSearch.forEach(({ value: type }) => {
       const comp = recommendation.components[type]
       if (comp) {
+        const productName = comp.name || "Unknown"
         build[type] = {
           id: `${type}-live`,
-          name: comp.name || "Unknown",
+          name: productName,
           type: type,
           price: comp.price || 0,
           specs: comp.specs || "",
           wattage: comp.wattage || 0,
-          links: comp.links || [],
+          // Generate search links based on product name
+          links: generateShopLinks(productName),
         }
       }
     })
