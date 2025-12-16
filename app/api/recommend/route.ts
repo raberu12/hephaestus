@@ -1,23 +1,12 @@
 import { google } from "@ai-sdk/google"
 import { generateText } from "ai"
-import type { QuizAnswers, ComponentType } from "@/lib/types"
+import { COMPONENT_TYPES, type QuizAnswers, type ComponentType, type PCComponent } from "@/lib/types"
 
 export const maxDuration = 60 // Increased for web search
 
 interface RecommendRequest {
   answers: QuizAnswers
 }
-
-const ALL_COMPONENTS: { type: ComponentType; label: string; minSpec?: string }[] = [
-  { type: "cpu", label: "CPU (Processor)" },
-  { type: "gpu", label: "GPU (Graphics Card)" },
-  { type: "motherboard", label: "Motherboard" },
-  { type: "ram", label: "RAM (Memory)", minSpec: "at least 16GB" },
-  { type: "storage", label: "Storage (SSD)", minSpec: "at least 500GB" },
-  { type: "psu", label: "PSU (Power Supply)" },
-  { type: "case", label: "Case" },
-  { type: "cooler", label: "CPU Cooler" },
-]
 
 export async function POST(req: Request) {
   try {
@@ -27,8 +16,8 @@ export async function POST(req: Request) {
     const reusedParts = answers.existingParts || []
 
     // Filter out components that are being reused
-    const componentsToSearch = ALL_COMPONENTS.filter(
-      (comp) => !reusedParts.includes(comp.type)
+    const componentsToSearch = COMPONENT_TYPES.filter(
+      (comp) => !reusedParts.includes(comp.value)
     )
 
     // If all components are reused, return empty build
@@ -50,12 +39,12 @@ export async function POST(req: Request) {
 
     // Build JSON template for components to search (includes shopping links)
     const componentJsonTemplate = componentsToSearch
-      .map((c) => `    "${c.type}": { "name": "full product name", "price": 12345, "specs": "brief specs", "wattage": 65, "links": [{"store": "Lazada", "url": "https://..."}, {"store": "Shopee", "url": "https://..."}] }`)
+      .map((c) => `    "${c.value}": { "name": "full product name", "price": 12345, "specs": "brief specs", "wattage": 65, "links": [{"store": "Lazada", "url": "https://..."}, {"store": "Shopee", "url": "https://..."}] }`)
       .join(",\n")
 
     const notesJsonTemplate = componentsToSearch
-      .map((c) => `    "${c.type}": "why this ${c.label}"`)
-      .join(",\n")
+      .map((c) => `    "${c.value}": "why this ${c.label}"`)
+      .join("\n")
 
     const prompt = `You are a PC building expert helping someone in the Philippines. Search for current PC component prices from Philippine retailers (Lazada, Shopee, PC Hub, DynaQuest, ITWorld, EasyPC, etc.).
 
@@ -112,7 +101,7 @@ ${notesJsonTemplate}
     // Transform to expected format
     const build: Record<ComponentType, { id: string; name: string; type: ComponentType; price: number; specs: string; wattage: number; links?: { store: string; url: string }[] }> = {} as any
 
-    componentsToSearch.forEach(({ type }) => {
+    componentsToSearch.forEach(({ value: type }) => {
       const comp = recommendation.components[type]
       if (comp) {
         build[type] = {

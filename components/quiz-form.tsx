@@ -22,22 +22,11 @@ import {
   Cpu,
   Wrench,
 } from "lucide-react"
-import type { QuizAnswers, ComponentType } from "@/lib/types"
+import { COMPONENT_TYPES, type QuizAnswers } from "@/lib/types"
 
 interface QuizFormProps {
   onComplete: (answers: QuizAnswers) => void
 }
-
-const COMPONENT_TYPES: { value: ComponentType; label: string }[] = [
-  { value: "cpu", label: "CPU (Processor)" },
-  { value: "gpu", label: "GPU (Graphics Card)" },
-  { value: "motherboard", label: "Motherboard" },
-  { value: "ram", label: "RAM (Memory)" },
-  { value: "storage", label: "Storage (SSD/HDD)" },
-  { value: "psu", label: "PSU (Power Supply)" },
-  { value: "case", label: "Case" },
-  { value: "cooler", label: "Cooler" },
-]
 
 interface ChoiceCardProps {
   value: string
