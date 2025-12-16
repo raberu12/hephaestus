@@ -1,6 +1,37 @@
 "use client"
 
-export default function HammerLoader() {
+import { useEffect, useState } from "react"
+
+interface LoaderProps {
+  retryCount?: number
+  maxRetries?: number
+}
+
+export default function HammerLoader({ retryCount = 0, maxRetries = 3 }: LoaderProps) {
+  const [progress, setProgress] = useState(0)
+  const isRetrying = retryCount > 1
+
+  // Fake progress bar animation
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setProgress((prev) => {
+        // Slow down as we get closer to 100%, never actually reach 100%
+        if (prev >= 95) return prev
+        const increment = Math.max(0.5, (100 - prev) * 0.02)
+        return Math.min(95, prev + increment)
+      })
+    }, 200)
+
+    return () => clearInterval(interval)
+  }, [retryCount])
+
+  // Reset progress when retry count changes
+  useEffect(() => {
+    if (retryCount > 1) {
+      setProgress(0)
+    }
+  }, [retryCount])
+
   return (
     <div className="flex flex-col items-center justify-center py-24 space-y-8">
       <div className="fire">
@@ -22,9 +53,27 @@ export default function HammerLoader() {
       </div>
 
       <div className="text-center space-y-2">
-        <h2 className="text-xl font-semibold">Forging Your Perfect Build</h2>
+        <h2 className="text-xl font-semibold">
+          {isRetrying ? `Retrying ${retryCount} of ${maxRetries}...` : "Forging Your Perfect Build"}
+        </h2>
         <p className="text-muted-foreground text-balance max-w-md leading-relaxed">
-          Our AI is analyzing compatible components and optimizing your build for peak performance
+          {isRetrying
+            ? "The AI is busy. Waiting a moment before trying again..."
+            : "Our AI is analyzing compatible components and optimizing your build for peak performance"
+          }
+        </p>
+      </div>
+
+      {/* Fake Progress Bar */}
+      <div className="w-full max-w-xs space-y-2">
+        <div className="h-2 bg-muted rounded-full overflow-hidden">
+          <div
+            className="h-full bg-primary rounded-full transition-all duration-300 ease-out"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+        <p className="text-xs text-muted-foreground text-center">
+          {isRetrying ? "Reconnecting..." : `${Math.round(progress)}% complete`}
         </p>
       </div>
 
