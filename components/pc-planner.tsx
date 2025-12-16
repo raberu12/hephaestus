@@ -8,15 +8,19 @@ import type { QuizAnswers, PCComponent, ComponentType } from "@/lib/types"
 
 type AppState = "quiz" | "loading" | "result"
 
+const MAX_RETRIES = 3
+
 export default function PCPlanner() {
   const [appState, setAppState] = useState<AppState>("quiz")
+  const [retryCount, setRetryCount] = useState(0)
   const [recommendedBuild, setRecommendedBuild] = useState<{
     build: Record<ComponentType, PCComponent>
+    reusedParts?: ComponentType[]
     reasoning: any
   } | null>(null)
 
-  const handleQuizComplete = async (answers: QuizAnswers) => {
-    setAppState("loading")
+  const fetchRecommendation = async (answers: QuizAnswers, attempt: number = 1): Promise<any> => {
+    setRetryCount(attempt)
 
     try {
       const response = await fetch("/api/recommend", {
@@ -25,21 +29,48 @@ export default function PCPlanner() {
         body: JSON.stringify({ answers }),
       })
 
-      if (!response.ok) throw new Error("Failed to generate recommendation")
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        // Check if it's a retryable error (503, 429, etc.)
+        if (response.status >= 500 || response.status === 429) {
+          throw new Error(`Server error: ${response.status}`)
+        }
+        throw new Error(errorData.error || "Failed to generate recommendation")
+      }
 
-      const data = await response.json()
+      return await response.json()
+    } catch (error) {
+      // Retry if we haven't exceeded max retries
+      if (attempt < MAX_RETRIES) {
+        // Wait before retrying (exponential backoff: 2s, 4s)
+        await new Promise(resolve => setTimeout(resolve, attempt * 2000))
+        return fetchRecommendation(answers, attempt + 1)
+      }
+      throw error
+    }
+  }
+
+  const handleQuizComplete = async (answers: QuizAnswers) => {
+    setAppState("loading")
+    setRetryCount(1)
+
+    try {
+      const data = await fetchRecommendation(answers)
       setRecommendedBuild(data)
       setAppState("result")
     } catch (error) {
       console.error("Failed to generate build:", error)
-      alert("Failed to generate build recommendation. Please try again.")
+      alert("Failed to generate build recommendation after multiple attempts. Please try again.")
       setAppState("quiz")
+    } finally {
+      setRetryCount(0)
     }
   }
 
   const handleReset = () => {
     setAppState("quiz")
     setRecommendedBuild(null)
+    setRetryCount(0)
   }
 
   return (
@@ -54,10 +85,15 @@ export default function PCPlanner() {
 
         {appState === "quiz" && <QuizForm onComplete={handleQuizComplete} />}
 
-        {appState === "loading" && <Loader />}
+        {appState === "loading" && <Loader retryCount={retryCount} maxRetries={MAX_RETRIES} />}
 
         {appState === "result" && recommendedBuild && (
-          <BuildResult build={recommendedBuild.build} reasoning={recommendedBuild.reasoning} onReset={handleReset} />
+          <BuildResult
+            build={recommendedBuild.build}
+            reusedParts={recommendedBuild.reusedParts || []}
+            reasoning={recommendedBuild.reasoning}
+            onReset={handleReset}
+          />
         )}
       </div>
     </div>
