@@ -85,28 +85,50 @@ export async function POST(req: Request) {
     if (isProductivity) {
       useCaseInstructions = `
 USE CASE: PRODUCTIVITY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 - NO discrete GPU required. Select an APU (CPU with integrated graphics).
 - CPU MUST be an APU: AMD Ryzen 5600G, 5700G, 8600G, or 8700G series.
-- Prioritize: CPU cores > RAM capacity > Storage speed.`
+- PRIORITY ORDER: CPU (APU) > RAM > Storage > Other components.
+- RAM is critical - recommend 32GB if budget allows, minimum 16GB.
+- Focus on multitasking capability and integrated graphics performance.`
     } else if (isGaming) {
       useCaseInstructions = `
 USE CASE: GAMING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 - Discrete GPU is MANDATORY - allocate 40-50% of total budget to GPU.
-- GPU is the highest priority component.
-- Prioritize: GPU > CPU > RAM > Storage.
-- Avoid CPU bottlenecks - pair appropriately with GPU tier.`
-    } else {
+- PRIORITY ORDER: GPU > CPU > RAM > Storage > Other components.
+- GPU is the HIGHEST priority - get the best GPU the budget allows.
+- CPU must NOT bottleneck the GPU - pair appropriately with GPU tier.
+- RAM: 16GB minimum, 32GB preferred for modern games.
+- Avoid CPU bottlenecks - match CPU tier to GPU tier.`
+    } else if (answers.primaryUse === "content-creation") {
       useCaseInstructions = `
-USE CASE: ${answers.primaryUse.toUpperCase()}
-- Include a discrete GPU for content creation/mixed workloads.
-- Balance all components appropriately for the use case.`
+USE CASE: CONTENT CREATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- Discrete GPU is MANDATORY for video editing, 3D rendering, etc.
+- PRIORITY ORDER: RAM > GPU > CPU > Storage > Other components.
+- RAM is the HIGHEST priority - recommend 32GB minimum, 64GB if budget allows.
+- GPU for hardware acceleration in editing software.
+- CPU with high core count preferred for rendering tasks.
+- Fast NVMe storage for large project files.`
+    } else {
+      // Mixed use
+      useCaseInstructions = `
+USE CASE: MIXED (GAMING + PRODUCTIVITY + CONTENT)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- Discrete GPU is MANDATORY for versatility.
+- PRIORITY ORDER: GPU > RAM > CPU > Storage > Other components.
+- Balance gaming performance with productivity capability.
+- RAM: 32GB recommended for multitasking across use cases.
+- CPU should handle both gaming and productivity workloads.
+- Consider overall system versatility over single-use optimization.`
     }
 
     // Calculate budget targets based on performance priority
     const budgetMin = Math.round(budgetPhp * 0.98)
     const budgetMax = budgetPhp
-    const balancedMin = Math.round(budgetPhp * 0.75)
-    const balancedMax = Math.round(budgetPhp * 0.90)
+    const balancedMin = Math.round(budgetPhp * 0.95)
+    const balancedMax = budgetPhp
     const valueMin = Math.round(budgetPhp * 0.50)
     const valueMax = Math.round(budgetPhp * 0.75)
 
@@ -120,17 +142,17 @@ BUDGET TARGET: ₱${budgetMin.toLocaleString()} - ₱${budgetMax.toLocaleString(
 ACCEPTABLE VARIANCE: ±2% MAXIMUM
 
 MANDATORY RULES:
-1. USE THE FULL BUDGET. Underspending is a FAILURE condition.
-2. Select the HIGHEST TIER components that fit the budget.
-3. Performance takes absolute priority over cost savings.
-4. If budget allows a better component, you MUST select it.
-5. Do NOT select cheaper alternatives to "save money."
-6. Diminishing returns are ACCEPTABLE in this mode.
+1. SELECT THE ABSOLUTE BEST COMPONENTS regardless of price efficiency.
+2. Price-to-performance ratio is IRRELEVANT - only raw performance matters.
+3. Diminishing returns are EXPECTED and ACCEPTABLE in this mode.
+4. If a more expensive component offers even marginal performance gains, SELECT IT.
+5. USE THE FULL BUDGET. Underspending is a FAILURE condition.
+6. Do NOT suggest "value" alternatives or cost savings.
 
 FAILURE CONDITIONS:
 - Total below ₱${budgetMin.toLocaleString()} without technical justification.
 - Selecting mid-tier when high-tier fits budget.
-- Suggesting "value" alternatives.`
+- Considering price-to-performance ratio.`
     } else if (answers.performancePriority === "value") {
       performancePriorityInstructions = `
 PERFORMANCE PRIORITY: BEST VALUE
@@ -142,18 +164,21 @@ MANDATORY RULES:
 2. Select components with best value, NOT highest tier.
 3. Underspending is EXPECTED and encouraged.
 4. Avoid diminishing returns - stay in value sweet spot.
-5. Total CAN be significantly under budget if value is optimal.`
+5. Total CAN be significantly under budget if value is optimal.
+6. Prioritize components that offer the most performance per peso.`
     } else {
       performancePriorityInstructions = `
 PERFORMANCE PRIORITY: BALANCED
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-BUDGET TARGET: ₱${balancedMin.toLocaleString()} - ₱${balancedMax.toLocaleString()} (75-90% of budget)
+BUDGET TARGET: ₱${balancedMin.toLocaleString()} - ₱${balancedMax.toLocaleString()} (95-100% of budget)
 
 MANDATORY RULES:
-1. Balance performance and value.
+1. GET AS CLOSE TO THE MAXIMUM BUDGET AS POSSIBLE.
 2. Select solid mid-to-high tier components.
-3. Avoid both extremes: not cheapest, not most expensive.
-4. Leave reasonable headroom but don't sacrifice performance.`
+3. Balance performance with reasonable value considerations.
+4. Do NOT leave significant budget unused - utilize 95%+ of budget.
+5. If within budget, prefer better components over saving money.
+6. Only leave headroom if it would cause component mismatch.`
     }
 
     const prompt = `You are a PC component recommendation system. You MUST follow ALL rules below with zero deviation.
