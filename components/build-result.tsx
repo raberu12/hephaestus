@@ -234,7 +234,7 @@ ${COMPONENT_LABELS[type as ComponentType]}:
 
 ${reasoning.tradeOffs ? `\nTrade-offs:\n${reasoning.tradeOffs}` : ""}
 
-Note: Prices are based on current Philippine retailer listings and may vary.
+Note: Prices are based on gathered PC parts data scraped from PC Partpicker dated July 2025.
 `
 
     const blob = new Blob([buildText], { type: "text/plain" })
@@ -442,7 +442,7 @@ Note: Prices are based on current Philippine retailer listings and may vary.
 
           <div className="flex items-start gap-2 p-3 rounded-lg bg-muted/50 text-xs text-muted-foreground">
             <Info className="w-4 h-4 shrink-0 mt-0.5" />
-            <p>Prices are based on current Philippine retailer listings and may vary. Always verify prices before purchasing.</p>
+            <p>Prices are based on gathered PC parts data scraped from PC Partpicker dated July 2025. Always verify prices before purchasing.</p>
           </div>
         </Card>
 
