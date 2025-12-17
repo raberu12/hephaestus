@@ -19,6 +19,7 @@ import { Loader2, Trash2, Calendar, Wallet, FolderOpen, ArrowLeft } from "lucide
 import { toast } from "sonner"
 import Link from "next/link"
 import type { SavedBuild } from "@/lib/types"
+import { motion } from "framer-motion"
 
 export default function BuildsClient() {
     const [builds, setBuilds] = useState<SavedBuild[]>([])
@@ -78,6 +79,21 @@ export default function BuildsClient() {
         )
     }
 
+    const container = {
+        hidden: { opacity: 0 },
+        show: {
+            opacity: 1,
+            transition: {
+                staggerChildren: 0.1
+            }
+        }
+    }
+
+    const item = {
+        hidden: { opacity: 0, y: 20 },
+        show: { opacity: 1, y: 0 }
+    }
+
     return (
         <div className="container mx-auto px-6 py-12 max-w-[1400px]">
             <div className="mb-8 space-y-4">
@@ -107,86 +123,93 @@ export default function BuildsClient() {
                     </Button>
                 </Card>
             ) : (
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <motion.div
+                    variants={container}
+                    initial="hidden"
+                    animate="show"
+                    className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"
+                >
                     {builds.map((build) => (
-                        <Card key={build.id} className="p-6 hover:border-primary/50 transition-colors group">
-                            <div className="space-y-4">
-                                <div className="flex items-start justify-between gap-4">
-                                    <div className="flex-1 min-w-0">
-                                        <h3 className="font-bold text-lg truncate">{build.name}</h3>
-                                        <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
-                                            <Calendar className="w-3.5 h-3.5" />
-                                            {formatDate(build.created_at)}
+                        <motion.div key={build.id} variants={item}>
+                            <Card className="p-6 hover:border-primary/50 transition-colors group active:scale-[0.99] transition-transform duration-200">
+                                <div className="space-y-4">
+                                    <div className="flex items-start justify-between gap-4">
+                                        <div className="flex-1 min-w-0">
+                                            <h3 className="font-bold text-lg truncate">{build.name}</h3>
+                                            <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
+                                                <Calendar className="w-3.5 h-3.5" />
+                                                {formatDate(build.created_at)}
+                                            </div>
                                         </div>
-                                    </div>
-                                    <AlertDialog>
-                                        <AlertDialogTrigger asChild>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-8 w-8 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
-                                            >
-                                                {deletingId === build.id ? (
-                                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                                ) : (
-                                                    <Trash2 className="w-4 h-4" />
-                                                )}
-                                            </Button>
-                                        </AlertDialogTrigger>
-                                        <AlertDialogContent>
-                                            <AlertDialogHeader>
-                                                <AlertDialogTitle>Delete Build</AlertDialogTitle>
-                                                <AlertDialogDescription>
-                                                    Are you sure you want to delete &quot;{build.name}&quot;? This action cannot be undone.
-                                                </AlertDialogDescription>
-                                            </AlertDialogHeader>
-                                            <AlertDialogFooter>
-                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                <AlertDialogAction
-                                                    onClick={() => handleDelete(build.id)}
-                                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                        <AlertDialog>
+                                            <AlertDialogTrigger asChild>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-8 w-8 text-muted-foreground hover:text-destructive transition-opacity opacity-100 md:opacity-0 md:group-hover:opacity-100"
                                                 >
-                                                    Delete
-                                                </AlertDialogAction>
-                                            </AlertDialogFooter>
-                                        </AlertDialogContent>
-                                    </AlertDialog>
-                                </div>
-
-                                <div className="flex items-center gap-4">
-                                    <div className="flex items-center gap-2">
-                                        <Wallet className="w-4 h-4 text-primary" />
-                                        <span className="font-bold">
-                                            ₱{build.total_price.toLocaleString()}
-                                        </span>
+                                                    {deletingId === build.id ? (
+                                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                                    ) : (
+                                                        <Trash2 className="w-4 h-4" />
+                                                    )}
+                                                </Button>
+                                            </AlertDialogTrigger>
+                                            <AlertDialogContent>
+                                                <AlertDialogHeader>
+                                                    <AlertDialogTitle>Delete Build</AlertDialogTitle>
+                                                    <AlertDialogDescription>
+                                                        Are you sure you want to delete &quot;{build.name}&quot;? This action cannot be undone.
+                                                    </AlertDialogDescription>
+                                                </AlertDialogHeader>
+                                                <AlertDialogFooter>
+                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                    <AlertDialogAction
+                                                        onClick={() => handleDelete(build.id)}
+                                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                                    >
+                                                        Delete
+                                                    </AlertDialogAction>
+                                                </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                        </AlertDialog>
                                     </div>
-                                    {build.reused_parts && build.reused_parts.length > 0 && (
-                                        <Badge variant="secondary" className="text-xs">
-                                            {build.reused_parts.length} reused
-                                        </Badge>
-                                    )}
-                                </div>
 
-                                <div className="flex flex-wrap gap-1.5">
-                                    {Object.keys(build.build).slice(0, 4).map((type) => (
-                                        <Badge key={type} variant="outline" className="text-xs">
-                                            {type.toUpperCase()}
-                                        </Badge>
-                                    ))}
-                                    {Object.keys(build.build).length > 4 && (
-                                        <Badge variant="outline" className="text-xs">
-                                            +{Object.keys(build.build).length - 4}
-                                        </Badge>
-                                    )}
-                                </div>
+                                    <div className="flex items-center gap-4">
+                                        <div className="flex items-center gap-2">
+                                            <Wallet className="w-4 h-4 text-primary" />
+                                            <span className="font-bold">
+                                                ₱{build.total_price.toLocaleString()}
+                                            </span>
+                                        </div>
+                                        {build.reused_parts && build.reused_parts.length > 0 && (
+                                            <Badge variant="secondary" className="text-xs">
+                                                {build.reused_parts.length} reused
+                                            </Badge>
+                                        )}
+                                    </div>
 
-                                <Button asChild variant="outline" className="w-full">
-                                    <Link href={`/builds/${build.id}`}>View Details</Link>
-                                </Button>
-                            </div>
-                        </Card>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {Object.keys(build.build).slice(0, 4).map((type) => (
+                                            <Badge key={type} variant="outline" className="text-xs">
+                                                {type.toUpperCase()}
+                                            </Badge>
+                                        ))}
+                                        {Object.keys(build.build).length > 4 && (
+                                            <Badge variant="outline" className="text-xs">
+                                                +{Object.keys(build.build).length - 4}
+                                            </Badge>
+                                        )}
+                                    </div>
+
+                                    <Button asChild variant="outline" className="w-full">
+                                        <Link href={`/builds/${build.id}`}>View Details</Link>
+                                    </Button>
+                                </div>
+                            </Card>
+                        </motion.div>
                     ))}
-                </div>
+                </motion.div>
             )}
         </div>
     )
