@@ -7,23 +7,18 @@ describe('Component Formatting', () => {
     it('formatCPUsForPrompt should format price without currency symbol', () => {
         const mockCPUs: ProcessedCPU[] = [
             {
-                id: 'cpu-1',
                 name: 'Test CPU',
-                type: 'cpu',
-                price: 10000,
+                priceUSD: 200,
                 pricePHP: 15000,
                 specs: 'Test Specs',
                 wattage: 65,
-                image: '',
-                description: '',
-                manufacturer: 'Intel',
-                socket: 'LGA1700',
-                cores: 8,
-                threads: 16,
-                baseClock: 3.5,
+                coreCount: 8,
+                coreClock: 3.5,
                 boostClock: 5.0,
-                integratedGraphics: false,
-                links: []
+                microarchitecture: 'Gen 14',
+                tdp: 65,
+                hasIntegratedGraphics: false,
+                brand: 'intel'
             }
         ]
 
