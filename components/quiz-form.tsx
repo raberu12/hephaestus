@@ -42,25 +42,25 @@ function ChoiceCard({ value, label, description, icon: Icon, isSelected, onClick
     <button
       onClick={onClick}
       className={`
-        relative p-6 rounded-lg border-2 transition-all duration-200 text-left
+        relative p-4 sm:p-6 rounded-lg border-2 transition-all duration-200 text-left
         hover:border-primary/50 hover:bg-primary/5
         card-hover btn-press
         ${isSelected ? "border-primary bg-primary/10" : "border-border bg-card"}
       `}
     >
-      <div className="space-y-3">
-        <div className={`inline-flex p-3 rounded-lg transition-all duration-200 ${isSelected ? "bg-primary/20" : "bg-muted"}`}>
-          <Icon className={`w-6 h-6 transition-all duration-200 ${isSelected ? "text-primary" : "text-muted-foreground"}`} />
+      <div className="space-y-2 sm:space-y-3">
+        <div className={`inline-flex p-2 sm:p-3 rounded-lg transition-all duration-200 ${isSelected ? "bg-primary/20" : "bg-muted"}`}>
+          <Icon className={`w-5 h-5 sm:w-6 sm:h-6 transition-all duration-200 ${isSelected ? "text-primary" : "text-muted-foreground"}`} />
         </div>
         <div>
-          <div className="font-semibold text-lg mb-1">{label}</div>
-          <div className="text-sm text-muted-foreground leading-relaxed">{description}</div>
+          <div className="font-semibold text-base sm:text-lg mb-1">{label}</div>
+          <div className="text-xs sm:text-sm text-muted-foreground leading-relaxed">{description}</div>
         </div>
       </div>
       {isSelected && (
-        <div className="absolute top-3 right-3 animate-check-pop">
-          <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
-            <svg className="w-4 h-4 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="absolute top-2 right-2 sm:top-3 sm:right-3 animate-check-pop">
+          <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-primary flex items-center justify-center">
+            <svg className="w-3 h-3 sm:w-4 sm:h-4 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </div>
@@ -189,7 +189,7 @@ export default function QuizForm({ onComplete }: QuizFormProps) {
               <h2 className="text-2xl font-bold mb-2">Performance Priority</h2>
               <p className="text-muted-foreground text-balance">What matters most for your build?</p>
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <ChoiceCard
                 value="max-performance"
                 label="Maximum Performance"
@@ -295,7 +295,7 @@ export default function QuizForm({ onComplete }: QuizFormProps) {
             <div className="space-y-6">
               <div className="space-y-3">
                 <Label className="text-base font-semibold">CPU Brand</Label>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-3 gap-2 sm:gap-3">
                   {[
                     { value: "any", label: "No Preference" },
                     { value: "intel", label: "Intel" },
@@ -307,7 +307,7 @@ export default function QuizForm({ onComplete }: QuizFormProps) {
                         updateAnswer("brandPreferences", { ...answers.brandPreferences, cpu: option.value as any })
                       }
                       className={`
-                        p-4 rounded-lg border-2 transition-all duration-200 font-semibold
+                        p-2 sm:p-4 rounded-lg border-2 transition-all duration-200 font-semibold text-center
                         hover:border-primary/50 hover:bg-primary/5
                         ${answers.brandPreferences.cpu === option.value
                           ? "border-primary bg-primary/10"
@@ -315,8 +315,8 @@ export default function QuizForm({ onComplete }: QuizFormProps) {
                         }
                       `}
                     >
-                      <Cpu className="w-5 h-5 mx-auto mb-2" />
-                      {option.label}
+                      <Cpu className="w-4 h-4 sm:w-5 sm:h-5 mx-auto mb-1 sm:mb-2" />
+                      <span className="text-xs sm:text-sm break-words leading-tight block">{option.label}</span>
                     </button>
                   ))}
                 </div>
@@ -324,7 +324,7 @@ export default function QuizForm({ onComplete }: QuizFormProps) {
 
               <div className="space-y-3">
                 <Label className="text-base font-semibold">GPU Brand</Label>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-3 gap-2 sm:gap-3">
                   {[
                     { value: "any", label: "No Preference" },
                     { value: "nvidia", label: "NVIDIA" },
@@ -336,7 +336,7 @@ export default function QuizForm({ onComplete }: QuizFormProps) {
                         updateAnswer("brandPreferences", { ...answers.brandPreferences, gpu: option.value as any })
                       }
                       className={`
-                        p-4 rounded-lg border-2 transition-all duration-200 font-semibold
+                        p-2 sm:p-4 rounded-lg border-2 transition-all duration-200 font-semibold text-center
                         hover:border-primary/50 hover:bg-primary/5
                         ${answers.brandPreferences.gpu === option.value
                           ? "border-primary bg-primary/10"
@@ -344,8 +344,8 @@ export default function QuizForm({ onComplete }: QuizFormProps) {
                         }
                       `}
                     >
-                      <Monitor className="w-5 h-5 mx-auto mb-2" />
-                      {option.label}
+                      <Monitor className="w-4 h-4 sm:w-5 sm:h-5 mx-auto mb-1 sm:mb-2" />
+                      <span className="text-xs sm:text-sm break-words leading-tight block">{option.label}</span>
                     </button>
                   ))}
                 </div>
