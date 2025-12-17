@@ -384,13 +384,13 @@ export function estimateFPS(gpuTier: number, resolution: '1080p' | '1440p' | '4k
 
 export function formatCPUsForPrompt(cpus: ProcessedCPU[]): string {
     return cpus.map(cpu =>
-        `- ${cpu.name} | ₱${cpu.pricePHP.toLocaleString()} | ${cpu.specs}`
+        `- ${cpu.name} | Price: ${cpu.pricePHP} | ${cpu.specs}`
     ).join('\n')
 }
 
 export function formatGPUsForPrompt(gpus: ProcessedGPU[]): string {
     return gpus.map(gpu =>
-        `- ${gpu.name} | ₱${gpu.pricePHP.toLocaleString()} | ${gpu.specs}`
+        `- ${gpu.name} | Price: ${gpu.pricePHP} | ${gpu.specs}`
     ).join('\n')
 }
 

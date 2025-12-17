@@ -280,6 +280,11 @@ RULE 4: TRANSPARENCY REQUIRED
 - State any technical limitations preventing optimal selection.
 - No hedging language. Be precise and declarative.
 
+RULE 5: STRICT JSON FORMATTING
+- "price" fields MUST be integers (e.g., 25000).
+- NO strings, NO commas, NO currency symbols (₱, PHP) in JSON numbers.
+- Example: "price": 25000 (CORRECT). "price": "₱25,000" (WRONG).
+
 ═══════════════════════════════════════════════════════════════
 USER'S QUIZ SELECTIONS (BINDING)
 ═══════════════════════════════════════════════════════════════
