@@ -1,9 +1,25 @@
-import { Cpu, Monitor, CircuitBoard, MemoryStick, HardDrive, Power, Box, Fan, Tv } from "lucide-react"
+import { Cpu, Monitor, CircuitBoard, MemoryStick, HardDrive, Power, Box, Fan, Tv, type LucideIcon } from "lucide-react"
 import type { ComponentType } from "@/lib/types"
 
 /**
- * Icons for each component type
- * Shared across build-result.tsx and build-detail-client.tsx
+ * Icon mapping for component types
+ * Returns the raw LucideIcon component to allow consumers to apply their own styling
+ */
+export const COMPONENT_ICON_MAP: Record<ComponentType, LucideIcon> = {
+    cpu: Cpu,
+    gpu: Monitor,
+    motherboard: CircuitBoard,
+    ram: MemoryStick,
+    storage: HardDrive,
+    psu: Power,
+    case: Box,
+    cooler: Fan,
+    monitor: Tv,
+}
+
+/**
+ * Icons for each component type (Pre-styled for build results)
+ * @deprecated Use COMPONENT_ICON_MAP instead for better flexibility
  */
 export const COMPONENT_ICONS: Record<ComponentType, React.ReactNode> = {
     cpu: <Cpu className="w-6 h-6 text-primary" />,
@@ -15,21 +31,6 @@ export const COMPONENT_ICONS: Record<ComponentType, React.ReactNode> = {
     case: <Box className="w-6 h-6 text-primary" />,
     cooler: <Fan className="w-6 h-6 text-primary" />,
     monitor: <Tv className="w-6 h-6 text-primary" />,
-}
-
-/**
- * Smaller icons for mobile views
- */
-export const COMPONENT_ICONS_SMALL: Record<ComponentType, React.ReactNode> = {
-    cpu: <Cpu className="w-5 h-5 text-primary" />,
-    gpu: <Monitor className="w-5 h-5 text-primary" />,
-    motherboard: <CircuitBoard className="w-5 h-5 text-primary" />,
-    ram: <MemoryStick className="w-5 h-5 text-primary" />,
-    storage: <HardDrive className="w-5 h-5 text-primary" />,
-    psu: <Power className="w-5 h-5 text-primary" />,
-    case: <Box className="w-5 h-5 text-primary" />,
-    cooler: <Fan className="w-5 h-5 text-primary" />,
-    monitor: <Tv className="w-5 h-5 text-primary" />,
 }
 
 /**

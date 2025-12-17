@@ -33,20 +33,11 @@ import {
   Info,
 } from "lucide-react"
 import { COMPONENT_TYPES, type QuizAnswers, type ComponentType, type PCComponent, COMPONENT_LABELS } from "@/lib/types"
+import { COMPONENT_ICON_MAP } from "@/lib/constants"
 import PartPickerModal from "./part-picker-modal"
 import { toast } from "sonner"
 
-const COMPONENT_ICONS: Record<ComponentType, React.ReactNode> = {
-  cpu: <Cpu className="w-5 h-5" />,
-  gpu: <Monitor className="w-5 h-5" />,
-  motherboard: <CircuitBoard className="w-5 h-5" />,
-  ram: <MemoryStick className="w-5 h-5" />,
-  storage: <HardDrive className="w-5 h-5" />,
-  psu: <Power className="w-5 h-5" />,
-  case: <Box className="w-5 h-5" />,
-  cooler: <Fan className="w-5 h-5" />,
-  monitor: <Tv className="w-5 h-5" />,
-}
+
 
 interface QuizFormProps {
   onComplete: (answers: QuizAnswers) => void
@@ -498,14 +489,15 @@ export default function QuizForm({ onComplete }: QuizFormProps) {
             <div className="space-y-4">
               {answers.existingParts.map((type) => {
                 const identified = answers.identifiedReusedParts?.[type]
+                const Icon = COMPONENT_ICON_MAP[type]
                 return (
                   <div key={type} className="border rounded-lg p-4 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between bg-card">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
-                        {COMPONENT_ICONS[type]}
+                      <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                        <Icon className="w-5 h-5" />
                       </div>
                       <div>
-                        <div className="font-semibold">{COMPONENT_LABELS[type]}</div>
+                        <div className="font-semibold capitalize">{COMPONENT_LABELS[type]}</div>
                         {identified ? (
                           <div className="text-sm text-green-600 font-medium">{identified.name}</div>
                         ) : (

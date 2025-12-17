@@ -19,6 +19,7 @@ import { ChevronDown, ChevronUp, Download, RotateCcw, Info, Cpu, Monitor, Circui
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { COMPONENT_LABELS, type PCComponent, type ComponentType, type ComponentReasoning, type BuildMetrics } from "@/lib/types"
+import { COMPONENT_ICON_MAP } from "@/lib/constants"
 import AuthModal from "./auth-modal"
 import PartPickerModal from "./part-picker-modal"
 
@@ -30,17 +31,7 @@ interface BuildResultProps {
   metrics?: BuildMetrics
 }
 
-const COMPONENT_ICONS: Record<ComponentType, React.ReactNode> = {
-  cpu: <Cpu className="w-6 h-6 text-primary" />,
-  gpu: <Monitor className="w-6 h-6 text-primary" />,
-  motherboard: <CircuitBoard className="w-6 h-6 text-primary" />,
-  ram: <MemoryStick className="w-6 h-6 text-primary" />,
-  storage: <HardDrive className="w-6 h-6 text-primary" />,
-  psu: <Power className="w-6 h-6 text-primary" />,
-  case: <Box className="w-6 h-6 text-primary" />,
-  cooler: <Fan className="w-6 h-6 text-primary" />,
-  monitor: <Tv className="w-6 h-6 text-primary" />,
-}
+
 
 export default function BuildResult({ build: initialBuild, reusedParts, reasoning, onReset, metrics }: BuildResultProps) {
   const [expandedComponents, setExpandedComponents] = useState<Set<ComponentType>>(new Set())
@@ -315,122 +306,125 @@ Note: Prices are based on current Philippine retailer listings and may vary.
 
           {/* New Components Section */}
           <div className="space-y-3">
-            {(Object.entries(build) as [ComponentType, PCComponent][]).map(([type, component], index) => (
-              <div key={type} className={`border rounded-lg overflow-hidden card-hover animate-slide-up stagger-${index + 1}`} style={{ opacity: 0 }}>
-                <button
-                  onClick={() => toggleComponent(type)}
-                  className="w-full flex items-center justify-between p-3 sm:p-4 hover:bg-muted/50 transition-colors text-left gap-3"
-                >
-                  {/* Left: Icon with label below on mobile */}
-                  <div className="flex flex-col items-center flex-shrink-0 w-14 sm:w-16">
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-md bg-primary/10 flex items-center justify-center">
-                      {COMPONENT_ICONS[type]}
-                    </div>
-                    <div className="flex flex-col gap-1 items-center w-full">
-                      <Badge variant="outline" className="text-[10px] sm:text-xs font-semibold px-1.5 w-full justify-center">
-                        {COMPONENT_LABELS[type]}
-                      </Badge>
-                      {ownedParts.has(type) && (
-                        <Badge variant="secondary" className="text-[10px] bg-green-500/10 text-green-600 border-green-500/20 px-1.5 w-full justify-center">
-                          Owned
+            {(Object.entries(build) as [ComponentType, PCComponent][]).map(([type, component], index) => {
+              const Icon = COMPONENT_ICON_MAP[type]
+              return (
+                <div key={type} className={`border rounded-lg overflow-hidden card-hover animate-slide-up stagger-${index + 1}`} style={{ opacity: 0 }}>
+                  <button
+                    onClick={() => toggleComponent(type)}
+                    className="w-full flex items-center justify-between p-3 sm:p-4 hover:bg-muted/50 transition-colors text-left gap-3"
+                  >
+                    {/* Left: Icon with label below on mobile */}
+                    <div className="flex flex-col items-center flex-shrink-0 w-14 sm:w-16">
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-md bg-primary/10 flex items-center justify-center">
+                        <Icon className="w-6 h-6 text-primary" />
+                      </div>
+                      <div className="flex flex-col gap-1 items-center w-full">
+                        <Badge variant="outline" className="text-[10px] sm:text-xs font-semibold px-1.5 w-full justify-center">
+                          {COMPONENT_LABELS[type]}
                         </Badge>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Middle: Product name */}
-                  <div className="flex-1 min-w-0">
-                    <div className="font-bold text-sm sm:text-base leading-tight line-clamp-2">
-                      {component.name}
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1 hidden sm:block">{component.specs}</div>
-                  </div>
-
-                  {/* Right: Price and expand */}
-                  <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
-                    <div className="text-right">
-                      <div className="font-bold text-sm sm:text-lg whitespace-nowrap">
-                        {ownedParts.has(type) ? (
-                          <span className="flex items-center gap-2 justify-end">
-                            <span className="line-through text-muted-foreground text-xs hidden sm:inline">₱{component.price.toLocaleString()}</span>
-                            <span className="text-green-600">₱0</span>
-                          </span>
-                        ) : (
-                          <span><span className="peso-symbol">₱</span>{component.price.toLocaleString()}</span>
+                        {ownedParts.has(type) && (
+                          <Badge variant="secondary" className="text-[10px] bg-green-500/10 text-green-600 border-green-500/20 px-1.5 w-full justify-center">
+                            Owned
+                          </Badge>
                         )}
                       </div>
                     </div>
-                    {expandedComponents.has(type) ? (
-                      <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground" />
-                    ) : (
-                      <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground" />
-                    )}
-                  </div>
-                </button>
 
-                {expandedComponents.has(type) && (
-                  <div className="p-3 sm:p-4 pt-0 border-t bg-muted/30 space-y-3 animate-slide-down">
-                    {/* Specs - visible only on mobile since hidden from card */}
-                    <div className="text-xs text-muted-foreground sm:hidden border-b border-border/50 pb-2">
-                      <span className="font-medium text-foreground">Specs:</span> {component.specs}
+                    {/* Middle: Product name */}
+                    <div className="flex-1 min-w-0">
+                      <div className="font-bold text-sm sm:text-base leading-tight line-clamp-2">
+                        {component.name}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1 hidden sm:block">{component.specs}</div>
                     </div>
 
-                    {/* Ownership Toggle */}
-                    <div className="flex items-center gap-2 pb-2">
-                      <input
-                        type="checkbox"
-                        id={`owned-${type}`}
-                        checked={ownedParts.has(type)}
-                        onChange={() => handleToggleOwned(type)}
-                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                      />
-                      <label htmlFor={`owned-${type}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                        I already own this part
-                      </label>
-                    </div>
-                    {/* AI Reasoning - hidden for manually swapped parts */}
-                    {!swappedParts.has(type) && reasoning.componentExplanations[type] && (
-                      <div className="text-sm leading-relaxed">{reasoning.componentExplanations[type]}</div>
-                    )}
-                    {swappedParts.has(type) && (
-                      <div className="text-sm leading-relaxed text-muted-foreground italic">Manually selected</div>
-                    )}
-                    <div className="flex flex-wrap items-center gap-2 pt-1">
-                      {component.links && component.links.length > 0 && (
-                        <>
-                          <span className="text-xs text-muted-foreground">Shop:</span>
-                          {component.links.map((link, idx) => (
-                            <a
-                              key={idx}
-                              href={link.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                            >
-                              {link.store}
-                              <ExternalLink className="w-3 h-3" />
-                            </a>
-                          ))}
-                          <span className="text-muted-foreground/50">•</span>
-                        </>
+                    {/* Right: Price and expand */}
+                    <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+                      <div className="text-right">
+                        <div className="font-bold text-sm sm:text-lg whitespace-nowrap">
+                          {ownedParts.has(type) ? (
+                            <span className="flex items-center gap-2 justify-end">
+                              <span className="line-through text-muted-foreground text-xs hidden sm:inline">₱{component.price.toLocaleString()}</span>
+                              <span className="text-green-600">₱0</span>
+                            </span>
+                          ) : (
+                            <span><span className="peso-symbol">₱</span>{component.price.toLocaleString()}</span>
+                          )}
+                        </div>
+                      </div>
+                      {expandedComponents.has(type) ? (
+                        <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground" />
                       )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2 text-xs gap-1"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleOpenPartPicker(type)
-                        }}
-                      >
-                        <Edit2 className="w-3 h-3" />
-                        Change
-                      </Button>
                     </div>
-                  </div>
-                )}
-              </div>
-            ))}
+                  </button>
+
+                  {expandedComponents.has(type) && (
+                    <div className="p-3 sm:p-4 pt-0 border-t bg-muted/30 space-y-3 animate-slide-down">
+                      {/* Specs - visible only on mobile since hidden from card */}
+                      <div className="text-xs text-muted-foreground sm:hidden border-b border-border/50 pb-2">
+                        <span className="font-medium text-foreground">Specs:</span> {component.specs}
+                      </div>
+
+                      {/* Ownership Toggle */}
+                      <div className="flex items-center gap-2 pb-2">
+                        <input
+                          type="checkbox"
+                          id={`owned-${type}`}
+                          checked={ownedParts.has(type)}
+                          onChange={() => handleToggleOwned(type)}
+                          className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                        />
+                        <label htmlFor={`owned-${type}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                          I already own this part
+                        </label>
+                      </div>
+                      {/* AI Reasoning - hidden for manually swapped parts */}
+                      {!swappedParts.has(type) && reasoning.componentExplanations[type] && (
+                        <div className="text-sm leading-relaxed">{reasoning.componentExplanations[type]}</div>
+                      )}
+                      {swappedParts.has(type) && (
+                        <div className="text-sm leading-relaxed text-muted-foreground italic">Manually selected</div>
+                      )}
+                      <div className="flex flex-wrap items-center gap-2 pt-1">
+                        {component.links && component.links.length > 0 && (
+                          <>
+                            <span className="text-xs text-muted-foreground">Shop:</span>
+                            {component.links.map((link, idx) => (
+                              <a
+                                key={idx}
+                                href={link.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                              >
+                                {link.store}
+                                <ExternalLink className="w-3 h-3" />
+                              </a>
+                            ))}
+                          </>
+                        )}
+
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-xs gap-1 ml-auto"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleOpenPartPicker(type)
+                          }}
+                        >
+                          <Edit2 className="w-3 h-3" />
+                          Change
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
 
           {reasoning.tradeOffs && (
@@ -443,7 +437,8 @@ Note: Prices are based on current Philippine retailer listings and may vary.
                 <p className="text-sm leading-relaxed">{reasoning.tradeOffs}</p>
               </div>
             </>
-          )}
+          )
+          }
 
           <div className="flex items-start gap-2 p-3 rounded-lg bg-muted/50 text-xs text-muted-foreground">
             <Info className="w-4 h-4 shrink-0 mt-0.5" />
@@ -468,7 +463,7 @@ Note: Prices are based on current Philippine retailer listings and may vary.
       </div>
 
       {/* Save Build Modal */}
-      <Dialog open={isSaveModalOpen} onOpenChange={setIsSaveModalOpen}>
+      < Dialog open={isSaveModalOpen} onOpenChange={setIsSaveModalOpen} >
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Save Your Build</DialogTitle>
