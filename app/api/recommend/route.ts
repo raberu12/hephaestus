@@ -16,9 +16,11 @@ import {
 
 export const maxDuration = 60
 
+import { env } from "@/lib/env"
+
 // Initialize OpenRouter with API key
 const openrouter = createOpenRouter({
-  apiKey: process.env.OPENROUTER_API_KEY,
+  apiKey: env.OPENROUTER_API_KEY,
 })
 
 // Generate search URLs for Philippine retailers

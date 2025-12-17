@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { getComponentsByType } from '@/lib/data/components'
 import { successResponse, errorResponse } from '@/lib/api/response'
 import { ComponentTypeSchema } from '@/lib/validation/schemas'
+import { logger } from '@/lib/logger'
 
 // Query params validation
 const QuerySchema = z.object({
@@ -36,7 +37,7 @@ export async function GET(req: NextRequest) {
             return errorResponse('Invalid query parameters', 400, 'VALIDATION_ERROR', error.errors)
         }
 
-        console.error('Components API error:', error)
+        logger.error('Components API error', { error: error instanceof Error ? error.message : String(error) })
         return errorResponse('Failed to fetch components', 500)
     }
 }
