@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
@@ -21,8 +21,32 @@ import {
   Zap,
   Cpu,
   Wrench,
+  CircuitBoard,
+  MemoryStick,
+  HardDrive,
+  Power,
+  Box,
+  Fan,
+  Tv,
+  Edit2,
+  CheckCircle2,
+  Info,
 } from "lucide-react"
-import { COMPONENT_TYPES, type QuizAnswers } from "@/lib/types"
+import { COMPONENT_TYPES, type QuizAnswers, type ComponentType, type PCComponent, COMPONENT_LABELS } from "@/lib/types"
+import PartPickerModal from "./part-picker-modal"
+import { toast } from "sonner"
+
+const COMPONENT_ICONS: Record<ComponentType, React.ReactNode> = {
+  cpu: <Cpu className="w-5 h-5" />,
+  gpu: <Monitor className="w-5 h-5" />,
+  motherboard: <CircuitBoard className="w-5 h-5" />,
+  ram: <MemoryStick className="w-5 h-5" />,
+  storage: <HardDrive className="w-5 h-5" />,
+  psu: <Power className="w-5 h-5" />,
+  case: <Box className="w-5 h-5" />,
+  cooler: <Fan className="w-5 h-5" />,
+  monitor: <Tv className="w-5 h-5" />,
+}
 
 interface QuizFormProps {
   onComplete: (answers: QuizAnswers) => void
@@ -83,14 +107,81 @@ export default function QuizForm({ onComplete }: QuizFormProps) {
       gpu: "any",
     },
     existingParts: [],
+    identifiedReusedParts: {},
   })
+
+  // Part picker state
+  const [isPartPickerOpen, setIsPartPickerOpen] = useState(false)
+  const [pickerType, setPickerType] = useState<ComponentType | null>(null)
+  const [availableComponents, setAvailableComponents] = useState<PCComponent[]>([])
+  const [isLoadingComponents, setIsLoadingComponents] = useState(false)
 
   const updateAnswer = <K extends keyof QuizAnswers>(key: K, value: QuizAnswers[K]) => {
     setAnswers((prev) => ({ ...prev, [key]: value }))
   }
 
+  // Load components when picker opens
+  useEffect(() => {
+    if (isPartPickerOpen && pickerType) {
+      setIsLoadingComponents(true)
+      fetch(`/api/components?type=${pickerType}&limit=500`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.components) {
+            setAvailableComponents(data.components)
+          } else if (data.data?.components) {
+            setAvailableComponents(data.data.components)
+          } else {
+            setAvailableComponents([])
+          }
+        })
+        .catch((err) => {
+          console.error("Failed to fetch components:", err)
+          toast.error("Failed to load components")
+        })
+        .finally(() => setIsLoadingComponents(false))
+    }
+  }, [isPartPickerOpen, pickerType])
+
+  const handleOpenPartPicker = (type: ComponentType) => {
+    setPickerType(type)
+    setIsPartPickerOpen(true)
+  }
+
+  const handleSelectIdentify = (component: PCComponent) => {
+    if (pickerType) {
+      setAnswers(prev => ({
+        ...prev,
+        identifiedReusedParts: {
+          ...prev.identifiedReusedParts,
+          [pickerType]: component
+        }
+      }))
+      setIsPartPickerOpen(false)
+      toast.success(`Identified ${COMPONENT_LABELS[pickerType]} as ${component.name}`)
+    }
+  }
+
+  const handleClearIdentify = (type: ComponentType) => {
+    setAnswers(prev => {
+      const next = { ...prev.identifiedReusedParts }
+      delete next[type]
+      return { ...prev, identifiedReusedParts: next }
+    })
+  }
+
   const handleNext = () => {
-    if (step < 6) {
+    // If at Existing Parts step (5)
+    if (step === 5) {
+      if (answers.existingParts.length > 0) {
+        setStep(6) // Go to Identify
+      } else {
+        setStep(7) // Skip to Review
+      }
+      return
+    }
+
+    if (step < 7) {
       setStep(step + 1)
     } else {
       onComplete(answers)
@@ -98,6 +189,11 @@ export default function QuizForm({ onComplete }: QuizFormProps) {
   }
 
   const handleBack = () => {
+    // If at Review step (7) and we skipped Identify
+    if (step === 7 && answers.existingParts.length === 0) {
+      setStep(5)
+      return
+    }
     if (step > 0) setStep(step - 1)
   }
 
@@ -394,6 +490,64 @@ export default function QuizForm({ onComplete }: QuizFormProps) {
         return (
           <div className="space-y-6">
             <div>
+              <h2 className="text-2xl font-bold mb-2">Identify Your Parts</h2>
+              <p className="text-muted-foreground text-balance">
+                Tell us which specific models you have so we can check compatibility (optional).
+              </p>
+            </div>
+            <div className="space-y-4">
+              {answers.existingParts.map((type) => {
+                const identified = answers.identifiedReusedParts?.[type]
+                return (
+                  <div key={type} className="border rounded-lg p-4 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between bg-card">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        {COMPONENT_ICONS[type]}
+                      </div>
+                      <div>
+                        <div className="font-semibold">{COMPONENT_LABELS[type]}</div>
+                        {identified ? (
+                          <div className="text-sm text-green-600 font-medium">{identified.name}</div>
+                        ) : (
+                          <div className="text-sm text-muted-foreground italic">Model unknown (Generic specs will be assumed)</div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                      {identified ? (
+                        <Button variant="outline" size="sm" onClick={() => handleClearIdentify(type)} className="flex-1 sm:flex-none">
+                          Clear
+                        </Button>
+                      ) : (
+                        <Button variant="secondary" size="sm" onClick={() => handleClearIdentify(type)} className="flex-1 sm:flex-none hidden">
+                          I don't know
+                        </Button>
+                      )}
+                      <Button
+                        variant={identified ? "secondary" : "default"}
+                        size="sm"
+                        onClick={() => handleOpenPartPicker(type)}
+                        className="flex-1 sm:flex-none gap-2"
+                      >
+                        {identified ? <Edit2 className="w-3 h-3" /> : <Sparkles className="w-3 h-3" />}
+                        {identified ? "Change" : "Identify Part"}
+                      </Button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+            <div className="bg-muted/30 p-4 rounded-lg text-xs text-muted-foreground flex gap-2">
+              <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+              <p>If you skip identification, we'll assume standard specifications. Identifying your PSU is highly recommended for accurate power calculations.</p>
+            </div>
+          </div>
+        )
+
+      case 7:
+        return (
+          <div className="space-y-6">
+            <div>
               <h2 className="text-2xl font-bold mb-2">Review Your Preferences</h2>
               <p className="text-muted-foreground text-balance">
                 Confirm your selections before we generate your personalized PC build
@@ -407,6 +561,7 @@ export default function QuizForm({ onComplete }: QuizFormProps) {
                   {answers.budget.toLocaleString()}
                 </span>
               </div>
+              {/* ... other summary items ... */}
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Primary Use</span>
                 <span className="font-semibold capitalize">{answers.primaryUse.replace("-", " ")}</span>
@@ -430,9 +585,19 @@ export default function QuizForm({ onComplete }: QuizFormProps) {
                 <span className="font-semibold capitalize">{answers.brandPreferences.gpu}</span>
               </div>
               {answers.existingParts.length > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Existing Parts</span>
-                  <span className="font-semibold">{answers.existingParts.length}</span>
+                <div className="border-t pt-3 mt-3">
+                  <div className="space-y-2">
+                    <div className="text-sm font-medium text-muted-foreground">Reusing Parts:</div>
+                    {answers.existingParts.map(type => {
+                      const id = answers.identifiedReusedParts?.[type]
+                      return (
+                        <div key={type} className="flex justify-between text-sm">
+                          <span>{COMPONENT_LABELS[type]}</span>
+                          <span className="font-medium">{id ? id.name : "Generic"}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
               )}
             </Card>
@@ -448,12 +613,12 @@ export default function QuizForm({ onComplete }: QuizFormProps) {
     <div className="w-full max-w-2xl mx-auto space-y-8">
       <div className="space-y-3">
         <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <span>Step {step + 1} of 7</span>
+          <span>Step {step + 1} of 8</span>
         </div>
         <div className="h-2 bg-muted rounded-full overflow-hidden">
           <div
             className="h-full bg-primary transition-all duration-300"
-            style={{ width: `${((step + 1) / 7) * 100}%` }}
+            style={{ width: `${((step + 1) / 8) * 100}%` }}
           />
         </div>
       </div>
@@ -466,7 +631,7 @@ export default function QuizForm({ onComplete }: QuizFormProps) {
           Back
         </Button>
         <Button onClick={handleNext} className="gap-2">
-          {step === 6 ? (
+          {step === 7 ? (
             <>
               <Sparkles className="w-4 h-4" />
               Generate My Build
@@ -479,6 +644,16 @@ export default function QuizForm({ onComplete }: QuizFormProps) {
           )}
         </Button>
       </div>
+
+      <PartPickerModal
+        open={isPartPickerOpen}
+        onOpenChange={setIsPartPickerOpen}
+        onSelect={handleSelectIdentify}
+        componentType={pickerType || "cpu"}
+        currentComponent={pickerType ? answers.identifiedReusedParts?.[pickerType] || null : null}
+        availableComponents={availableComponents}
+        isLoading={isLoadingComponents}
+      />
     </div>
   )
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -15,17 +15,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { ChevronDown, ChevronUp, Download, RotateCcw, Info, Cpu, Monitor, CircuitBoard, MemoryStick, HardDrive, Power, Box, Fan, Recycle, ExternalLink, Tv, Save, Loader2 } from "lucide-react"
+import { ChevronDown, ChevronUp, Download, RotateCcw, Info, Cpu, Monitor, CircuitBoard, MemoryStick, HardDrive, Power, Box, Fan, Recycle, ExternalLink, Tv, Save, Loader2, Edit2 } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
-import { COMPONENT_LABELS, type PCComponent, type ComponentType, type ComponentReasoning } from "@/lib/types"
+import { COMPONENT_LABELS, type PCComponent, type ComponentType, type ComponentReasoning, type BuildMetrics } from "@/lib/types"
 import AuthModal from "./auth-modal"
+import PartPickerModal from "./part-picker-modal"
 
 interface BuildResultProps {
   build: Record<ComponentType, PCComponent>
   reusedParts: ComponentType[]
   reasoning: ComponentReasoning
   onReset: () => void
+  metrics?: BuildMetrics
 }
 
 const COMPONENT_ICONS: Record<ComponentType, React.ReactNode> = {
@@ -40,12 +42,63 @@ const COMPONENT_ICONS: Record<ComponentType, React.ReactNode> = {
   monitor: <Tv className="w-6 h-6 text-primary" />,
 }
 
-export default function BuildResult({ build, reusedParts, reasoning, onReset }: BuildResultProps) {
+export default function BuildResult({ build: initialBuild, reusedParts, reasoning, onReset, metrics }: BuildResultProps) {
   const [expandedComponents, setExpandedComponents] = useState<Set<ComponentType>>(new Set())
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false)
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
   const [buildName, setBuildName] = useState("")
   const [isSaving, setIsSaving] = useState(false)
+
+  // Initialize build with placeholders for reused parts if missing
+  const [currentBuild, setCurrentBuild] = useState(() => {
+    const build = { ...initialBuild }
+    reusedParts.forEach(type => {
+      if (!build[type]) {
+        build[type] = {
+          id: `reused-${type}`,
+          name: `Existing ${COMPONENT_LABELS[type]}`,
+          type: type,
+          price: 0,
+          specs: "Specs unknown (Reuse)",
+          wattage: 0,
+        }
+      }
+    })
+    return build
+  })
+
+  // Track which parts are owned (reused)
+  const [ownedParts, setOwnedParts] = useState<Set<ComponentType>>(new Set(reusedParts))
+
+  // Part picker state
+  const [isPartPickerOpen, setIsPartPickerOpen] = useState(false)
+  const [selectedComponentType, setSelectedComponentType] = useState<ComponentType | null>(null)
+  const [availableComponents, setAvailableComponents] = useState<PCComponent[]>([])
+  const [isLoadingComponents, setIsLoadingComponents] = useState(false)
+  const [swappedParts, setSwappedParts] = useState<Set<ComponentType>>(new Set())
+
+  useEffect(() => {
+    if (isPartPickerOpen && selectedComponentType) {
+      setIsLoadingComponents(true)
+      fetch(`/api/components?type=${selectedComponentType}&limit=500`)
+        .then((res) => res.json())
+        .then((data) => {
+          // Handle both direct array and wrapped response formats
+          if (data.components) {
+            setAvailableComponents(data.components)
+          } else if (data.data?.components) {
+            setAvailableComponents(data.data.components)
+          } else {
+            setAvailableComponents([])
+          }
+        })
+        .catch((err) => {
+          console.error("Failed to fetch components:", err)
+          toast.error("Failed to load components")
+        })
+        .finally(() => setIsLoadingComponents(false))
+    }
+  }, [isPartPickerOpen, selectedComponentType])
 
   const toggleComponent = (type: ComponentType) => {
     setExpandedComponents((prev) => {
@@ -59,9 +112,55 @@ export default function BuildResult({ build, reusedParts, reasoning, onReset }: 
     })
   }
 
-  // Prices from live search are already in PHP (reused parts have no cost)
-  const totalPrice = Object.values(build).reduce((sum, component) => sum + (component?.price || 0), 0)
-  const totalWattage = Object.values(build).reduce((sum, component) => sum + (component?.wattage || 0), 0)
+  const handleOpenPartPicker = (type: ComponentType) => {
+    // Set loading immediately to show spinner from the start
+    setIsLoadingComponents(true)
+    setSelectedComponentType(type)
+    setAvailableComponents([])
+    setIsPartPickerOpen(true)
+  }
+
+  const handleSwapComponent = (newComponent: PCComponent) => {
+    if (selectedComponentType) {
+      setCurrentBuild((prev) => ({
+        ...prev,
+        [selectedComponentType]: newComponent,
+      }))
+      // Mark this component as manually swapped (to hide AI reasoning)
+      setSwappedParts((prev) => new Set(prev).add(selectedComponentType))
+      toast.success(`${COMPONENT_LABELS[selectedComponentType]} updated!`)
+    }
+  }
+
+  const handleToggleOwned = (type: ComponentType) => {
+    setOwnedParts((prev) => {
+      const next = new Set(prev)
+      prev.has(type) ? next.delete(type) : next.add(type)
+      return next
+    })
+  }
+
+  // Use currentBuild for display (supports swapping)
+  const build = currentBuild
+
+  // Prices from live search are already in PHP
+  // Exclude owned parts from total price
+  const totalPrice = Object.values(currentBuild).reduce((sum, component) => {
+    if (ownedParts.has(component.type)) return sum
+    return sum + (component?.price || 0)
+  }, 0)
+
+  // Calculate total wattage (excluding PSU capacity)
+  const totalWattage = Object.values(build).reduce((sum, component) => {
+    if (component.type === 'psu') return sum
+    return sum + (component?.wattage || 0)
+  }, 0)
+
+  // Calculate dynamic PSU headroom based on current build
+  const psuWattage = build.psu?.wattage || 0
+  const currentHeadroom = psuWattage > 0
+    ? Math.round(((psuWattage - totalWattage) / psuWattage) * 100)
+    : 0
 
   const handleSaveClick = async () => {
     const supabase = createClient()
@@ -165,57 +264,54 @@ Note: Prices are based on current Philippine retailer listings and may vary.
         </div>
 
         <Card className="p-6 space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6">
             <div className="text-center space-y-1">
-              <div className="text-3xl font-bold text-primary">
+              <div className="text-2xl sm:text-3xl font-bold text-primary">
                 <span className="peso-symbol">₱</span>
                 {totalPrice.toLocaleString()}
               </div>
-              <div className="text-sm text-muted-foreground">{"Total Cost"}</div>
+              <div className="text-xs sm:text-sm text-muted-foreground">{"Total Cost"}</div>
             </div>
             <div className="text-center space-y-1">
-              <div className="text-3xl font-bold">{totalWattage}W</div>
-              <div className="text-sm text-muted-foreground">{"Power Draw"}</div>
+              <div className="text-2xl sm:text-3xl font-bold">{totalWattage}W</div>
+              <div className="text-xs sm:text-sm text-muted-foreground">{"Power Draw"}</div>
             </div>
+            {metrics?.estimatedFPS && metrics.estimatedFPS.high > 0 && (
+              <div className="text-center space-y-1">
+                <div className="text-2xl sm:text-3xl font-bold text-green-500">
+                  {metrics.estimatedFPS.low}-{metrics.estimatedFPS.high}
+                </div>
+                <div className="text-xs sm:text-sm text-muted-foreground">
+                  Est. FPS @ {metrics.targetResolution || '1080p'}
+                </div>
+              </div>
+            )}
+            {currentHeadroom > 0 ? (
+              <div className="text-center space-y-1">
+                <div className={`text-2xl sm:text-3xl font-bold ${currentHeadroom >= 20 ? 'text-green-500' :
+                  currentHeadroom >= 10 ? 'text-yellow-500' : 'text-red-500'
+                  }`}>
+                  {currentHeadroom}%
+                </div>
+                <div className="text-xs sm:text-sm text-muted-foreground">{"PSU Headroom"}</div>
+              </div>
+            ) : (
+              <div className="text-center space-y-1">
+                <div className="text-sm sm:text-base font-bold text-muted-foreground pt-1 sm:pt-2">
+                  Not available
+                </div>
+                <div className="text-[10px] sm:text-xs text-muted-foreground leading-tight">
+                  Missing components
+                  <br className="hidden sm:block" />
+                  specs
+                </div>
+              </div>
+            )}
           </div>
 
           <Separator />
 
-          {/* Reused Parts Section */}
-          {reusedParts.length > 0 && (
-            <>
-              <div className="space-y-3">
-                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
-                  <Recycle className="w-4 h-4" />
-                  Reusing from Existing Build
-                </h3>
-                {reusedParts.map((type) => (
-                  <div key={type} className="border border-dashed rounded-lg p-4 bg-muted/20">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-md bg-green-500/10 flex items-center justify-center flex-shrink-0">
-                        {COMPONENT_ICONS[type]}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3">
-                          <Badge variant="outline" className="text-xs font-semibold">
-                            {COMPONENT_LABELS[type]}
-                          </Badge>
-                          <Badge className="bg-green-500/20 text-green-600 border-green-500/30 text-xs">
-                            Reusing
-                          </Badge>
-                        </div>
-                        <div className="text-sm text-muted-foreground mt-1">Using your existing {COMPONENT_LABELS[type].toLowerCase()}</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-bold text-lg text-green-600">₱0</div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <Separator />
-            </>
-          )}
+
 
           {/* New Components Section */}
           <div className="space-y-3">
@@ -230,9 +326,16 @@ Note: Prices are based on current Philippine retailer listings and may vary.
                     <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-md bg-primary/10 flex items-center justify-center">
                       {COMPONENT_ICONS[type]}
                     </div>
-                    <Badge variant="outline" className="text-[10px] sm:text-xs font-semibold mt-1.5 px-1.5">
-                      {COMPONENT_LABELS[type]}
-                    </Badge>
+                    <div className="flex flex-col gap-1 items-center w-full">
+                      <Badge variant="outline" className="text-[10px] sm:text-xs font-semibold px-1.5 w-full justify-center">
+                        {COMPONENT_LABELS[type]}
+                      </Badge>
+                      {ownedParts.has(type) && (
+                        <Badge variant="secondary" className="text-[10px] bg-green-500/10 text-green-600 border-green-500/20 px-1.5 w-full justify-center">
+                          Owned
+                        </Badge>
+                      )}
+                    </div>
                   </div>
 
                   {/* Middle: Product name */}
@@ -247,8 +350,14 @@ Note: Prices are based on current Philippine retailer listings and may vary.
                   <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
                     <div className="text-right">
                       <div className="font-bold text-sm sm:text-lg whitespace-nowrap">
-                        <span className="peso-symbol">₱</span>
-                        {component.price.toLocaleString()}
+                        {ownedParts.has(type) ? (
+                          <span className="flex items-center gap-2 justify-end">
+                            <span className="line-through text-muted-foreground text-xs hidden sm:inline">₱{component.price.toLocaleString()}</span>
+                            <span className="text-green-600">₱0</span>
+                          </span>
+                        ) : (
+                          <span><span className="peso-symbol">₱</span>{component.price.toLocaleString()}</span>
+                        )}
                       </div>
                     </div>
                     {expandedComponents.has(type) ? (
@@ -265,24 +374,59 @@ Note: Prices are based on current Philippine retailer listings and may vary.
                     <div className="text-xs text-muted-foreground sm:hidden border-b border-border/50 pb-2">
                       <span className="font-medium text-foreground">Specs:</span> {component.specs}
                     </div>
-                    <div className="text-sm leading-relaxed">{reasoning.componentExplanations[type]}</div>
-                    {component.links && component.links.length > 0 && (
-                      <div className="flex flex-wrap gap-2">
-                        <span className="text-xs text-muted-foreground">Shop:</span>
-                        {component.links.map((link, idx) => (
-                          <a
-                            key={idx}
-                            href={link.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                          >
-                            {link.store}
-                            <ExternalLink className="w-3 h-3" />
-                          </a>
-                        ))}
-                      </div>
+
+                    {/* Ownership Toggle */}
+                    <div className="flex items-center gap-2 pb-2">
+                      <input
+                        type="checkbox"
+                        id={`owned-${type}`}
+                        checked={ownedParts.has(type)}
+                        onChange={() => handleToggleOwned(type)}
+                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                      />
+                      <label htmlFor={`owned-${type}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                        I already own this part
+                      </label>
+                    </div>
+                    {/* AI Reasoning - hidden for manually swapped parts */}
+                    {!swappedParts.has(type) && reasoning.componentExplanations[type] && (
+                      <div className="text-sm leading-relaxed">{reasoning.componentExplanations[type]}</div>
                     )}
+                    {swappedParts.has(type) && (
+                      <div className="text-sm leading-relaxed text-muted-foreground italic">Manually selected</div>
+                    )}
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      {component.links && component.links.length > 0 && (
+                        <>
+                          <span className="text-xs text-muted-foreground">Shop:</span>
+                          {component.links.map((link, idx) => (
+                            <a
+                              key={idx}
+                              href={link.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                            >
+                              {link.store}
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          ))}
+                          <span className="text-muted-foreground/50">•</span>
+                        </>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-xs gap-1"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleOpenPartPicker(type)
+                        }}
+                      >
+                        <Edit2 className="w-3 h-3" />
+                        Change
+                      </Button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -367,6 +511,19 @@ Note: Prices are based on current Philippine retailer listings and may vary.
         onOpenChange={setIsAuthModalOpen}
         onSuccess={() => setIsSaveModalOpen(true)}
       />
+
+      {/* Part Picker Modal for component swapping */}
+      {selectedComponentType && (
+        <PartPickerModal
+          open={isPartPickerOpen}
+          onOpenChange={setIsPartPickerOpen}
+          componentType={selectedComponentType}
+          currentComponent={build[selectedComponentType] || null}
+          onSelect={handleSwapComponent}
+          availableComponents={availableComponents}
+          isLoading={isLoadingComponents}
+        />
+      )}
     </>
   )
 }

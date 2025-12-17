@@ -92,6 +92,7 @@ export default function PCPlanner() {
             reusedParts={recommendedBuild.reusedParts || []}
             reasoning={recommendedBuild.reasoning}
             onReset={handleReset}
+            metrics={recommendedBuild.metrics}
           />
         )}
       </div>
