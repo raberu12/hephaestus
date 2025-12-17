@@ -109,7 +109,7 @@ Note: Prices are based on current Philippine retailer listings and may vary.
                 </div>
 
                 <Card className="p-6 space-y-6">
-                    <div className="grid grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                         <div className="text-center space-y-1">
                             <div className="text-3xl font-bold text-primary">
                                 <span className="peso-symbol">₱</span>
@@ -167,39 +167,48 @@ Note: Prices are based on current Philippine retailer listings and may vary.
                             <div key={type} className="border rounded-lg overflow-hidden">
                                 <button
                                     onClick={() => toggleComponent(type)}
-                                    className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors text-left"
+                                    className="w-full flex items-center justify-between p-3 sm:p-4 hover:bg-muted/50 transition-colors text-left gap-3"
                                 >
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                    {/* Left: Icon with label below on mobile */}
+                                    <div className="flex flex-col items-center flex-shrink-0 w-14 sm:w-16">
+                                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-md bg-primary/10 flex items-center justify-center">
                                             {COMPONENT_ICONS[type]}
                                         </div>
-                                        <div className="flex-1">
-                                            <div className="flex items-center gap-3 mb-2">
-                                                <Badge variant="outline" className="text-xs font-semibold">
-                                                    {COMPONENT_LABELS[type]}
-                                                </Badge>
-                                                <span className="font-bold">{component.name}</span>
-                                            </div>
-                                            <div className="text-sm text-muted-foreground">{component.specs}</div>
-                                        </div>
+                                        <Badge variant="outline" className="text-[10px] sm:text-xs font-semibold mt-1.5 px-1.5">
+                                            {COMPONENT_LABELS[type]}
+                                        </Badge>
                                     </div>
-                                    <div className="flex items-center gap-4">
+
+                                    {/* Middle: Product name */}
+                                    <div className="flex-1 min-w-0">
+                                        <div className="font-bold text-sm sm:text-base leading-tight line-clamp-2">
+                                            {component.name}
+                                        </div>
+                                        <div className="text-xs text-muted-foreground mt-1 hidden sm:block">{component.specs}</div>
+                                    </div>
+
+                                    {/* Right: Price and expand */}
+                                    <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
                                         <div className="text-right">
-                                            <div className="font-bold text-lg">
+                                            <div className="font-bold text-sm sm:text-lg whitespace-nowrap">
                                                 <span className="peso-symbol">₱</span>
                                                 {component.price.toLocaleString()}
                                             </div>
                                         </div>
                                         {expandedComponents.has(type) ? (
-                                            <ChevronUp className="w-5 h-5 text-muted-foreground" />
+                                            <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground" />
                                         ) : (
-                                            <ChevronDown className="w-5 h-5 text-muted-foreground" />
+                                            <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground" />
                                         )}
                                     </div>
                                 </button>
 
                                 {expandedComponents.has(type) && (
-                                    <div className="p-4 pt-0 border-t bg-muted/30 space-y-4">
+                                    <div className="p-3 sm:p-4 pt-0 border-t bg-muted/30 space-y-3">
+                                        {/* Specs - visible only on mobile since hidden from card */}
+                                        <div className="text-xs text-muted-foreground sm:hidden border-b border-border/50 pb-2">
+                                            <span className="font-medium text-foreground">Specs:</span> {component.specs}
+                                        </div>
                                         <div className="text-sm leading-relaxed">{build.reasoning.componentExplanations[type]}</div>
                                         {component.links && component.links.length > 0 && (
                                             <div className="flex flex-wrap gap-2">
@@ -242,7 +251,7 @@ Note: Prices are based on current Philippine retailer listings and may vary.
                     </div>
                 </Card>
 
-                <div className="flex gap-4">
+                <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                     <Button onClick={handleExport} variant="outline" className="gap-2 flex-1 bg-transparent">
                         <Download className="w-4 h-4" />
                         {"Export .txt"}
