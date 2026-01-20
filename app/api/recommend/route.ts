@@ -267,9 +267,11 @@ RULE 1: QUIZ RESULTS ARE AUTHORITATIVE
 - You CANNOT override, reinterpret, or deviate from these inputs.
 - No assumptions. No defaults. No heuristics. Only quiz data.
 
-RULE 2: BUDGET IS A HARD CONSTRAINT
-- Maximum Budget: ₱${budgetPhp.toLocaleString()} PHP
+RULE 2: BUDGET IS A HARD CONSTRAINT [CRITICAL]
+- Maximum Budget: ₱${budgetPhp.toLocaleString()} PHP (exactly ${budgetPhp} as an integer)
 - You MUST NOT exceed this amount under any circumstance.
+- The "totalPrice" field in your JSON response MUST be <= ${budgetPhp}
+- If totalPrice > ${budgetPhp}, the entire response is INVALID and will be rejected.
 - Underspending rules depend on Performance Priority (see below).
 
 RULE 3: NO UNSOLICITED COST SAVINGS
@@ -323,7 +325,7 @@ OUTPUT FORMAT (STRICT JSON - NO MARKDOWN, NO EXPLANATION)
   "components": {
 ${componentJsonTemplate}
   },
-  "totalPrice": 12345,
+  "totalPrice": 12345,  // MUST be <= ${budgetPhp} or response is INVALID
   "reasoning": "Two sentences only. State what was built and how budget was utilized.",
   "notes": {
 ${notesJsonTemplate}
@@ -333,11 +335,11 @@ ${notesJsonTemplate}
     // Use OpenRouter with a FREE model
     const { text } = await withTiming('AI generation', async () => {
       return generateText({
-        model: openrouter("google/gemini-2.0-flash-001"),
+        model: openrouter("nvidia/nemotron-nano-9b-v2:free"),
         prompt,
         temperature: 0.3,
       })
-    }, { model: 'gemini-2.0-flash-001' })
+    }, { model: 'nvidia/nemotron-nano-9b-v2:free' })
 
     // Parse the AI response with Zod validation
     const jsonMatch = text.match(/\{[\s\S]*\}/)
@@ -358,8 +360,32 @@ ${notesJsonTemplate}
       throw new Error("AI response did not match expected schema")
     }
 
+    // Budget enforcement: Reject builds that exceed the budget
+    const aiTotalPrice = recommendation.totalPrice || 0
+    if (aiTotalPrice > budgetPhp) {
+      const overagePercent = Math.round(((aiTotalPrice - budgetPhp) / budgetPhp) * 100)
+      logger.warn('AI exceeded budget constraint', {
+        budget: budgetPhp,
+        aiTotal: aiTotalPrice,
+        overage: aiTotalPrice - budgetPhp,
+        overagePercent: `${overagePercent}%`
+      })
+
+      // If overage is more than 10%, reject the build
+      if (overagePercent > 10) {
+        return errorResponse(
+          `Build exceeded budget by ${overagePercent}%. Please try again with a higher budget or different preferences.`,
+          400,
+          'BUDGET_EXCEEDED',
+          { budget: budgetPhp, totalPrice: aiTotalPrice, overage: aiTotalPrice - budgetPhp }
+        )
+      }
+      // For small overages (<=10%), log warning but allow it
+      logger.info('Allowing small budget overage', { overagePercent: `${overagePercent}%` })
+    }
+
     // Transform to expected format and add generated shop links
-    const build: Record<ComponentType, { id: string; name: string; type: ComponentType; price: number; specs: string; wattage: number; links: { store: string; url: string }[] }> = {} as any
+    const build = {} as Partial<Record<ComponentType, { id: string; name: string; type: ComponentType; price: number; specs: string; wattage: number; links: { store: string; url: string }[] }>>
 
     componentsToSearch.forEach(({ value: type }) => {
       const comp = recommendation.components[type]
