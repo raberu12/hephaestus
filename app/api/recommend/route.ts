@@ -1,16 +1,26 @@
 import { createOpenRouter } from "@openrouter/ai-sdk-provider"
 import { generateText } from "ai"
-import { COMPONENT_TYPES, type QuizAnswers, type ComponentType } from "@/lib/types"
+import { COMPONENT_TYPES, type ComponentType } from "@/lib/types"
+import { RecommendRequestSchema, AIRecommendationSchema } from "@/lib/validation/schemas"
+import { logger, withTiming } from "@/lib/logger"
+import { errorResponse, successResponse } from "@/lib/api/response"
+import { ZodError } from "zod"
+import {
+  filterCPUs,
+  filterGPUs,
+  formatCPUsForPrompt,
+  formatGPUsForPrompt,
+  estimateFPS,
+  type ProcessedGPU
+} from "@/lib/data/components"
 
 export const maxDuration = 60
 
-interface RecommendRequest {
-  answers: QuizAnswers
-}
+import { env } from "@/lib/env"
 
 // Initialize OpenRouter with API key
 const openrouter = createOpenRouter({
-  apiKey: process.env.OPENROUTER_API_KEY,
+  apiKey: env.OPENROUTER_API_KEY,
 })
 
 // Generate search URLs for Philippine retailers
@@ -43,13 +53,28 @@ function getComponentsForUseCase(
 }
 
 export async function POST(req: Request) {
+  const startTime = performance.now()
+
   try {
-    const { answers }: RecommendRequest = await req.json()
+    // Validate request body with Zod
+    const body = await req.json()
+    const { answers } = RecommendRequestSchema.parse(body)
 
     const budgetPhp = answers.budget
     const reusedParts = answers.existingParts || []
+    const identifiedParts = answers.identifiedReusedParts || {}
     const isProductivity = answers.primaryUse === "productivity"
     const isGaming = answers.primaryUse === "gaming"
+
+    logger.info('Recommendation request received', {
+      budget: budgetPhp,
+      primaryUse: answers.primaryUse,
+      performancePriority: answers.performancePriority,
+      reusedPartsCount: reusedParts.length,
+      identifiedPartsCount: Object.keys(identifiedParts).length,
+    })
+
+
 
     // Get components based on use case
     const componentsToSearch = getComponentsForUseCase(answers.primaryUse, reusedParts)
@@ -66,6 +91,48 @@ export async function POST(req: Request) {
       })
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // Filter components from database based on quiz answers
+    // ═══════════════════════════════════════════════════════════════
+
+    // Filter CPUs based on budget and brand preference
+    const filteredCPUs = filterCPUs({
+      maxBudgetPHP: budgetPhp,
+      brandPreference: answers.brandPreferences.cpu as 'any' | 'intel' | 'amd',
+      requireIntegratedGraphics: isProductivity, // APUs for productivity
+      limit: 25,
+    })
+
+    // Filter GPUs based on budget and brand preference (skip for productivity)
+    let filteredGPUs: ProcessedGPU[] = []
+    let selectedGPUTier = 0
+    if (!isProductivity) {
+      filteredGPUs = filterGPUs({
+        maxBudgetPHP: budgetPhp,
+        brandPreference: answers.brandPreferences.gpu as 'any' | 'nvidia' | 'amd',
+        limit: 25,
+      })
+      // Get the highest tier GPU for FPS estimation
+      if (filteredGPUs.length > 0) {
+        selectedGPUTier = Math.max(...filteredGPUs.map(g => g.tier))
+      }
+    }
+
+    // Format component lists for AI prompt
+    const cpuListForPrompt = filteredCPUs.length > 0
+      ? `\nAVAILABLE CPUs (select ONE from this list):\n${formatCPUsForPrompt(filteredCPUs)}`
+      : ""
+
+    const gpuListForPrompt = !isProductivity && filteredGPUs.length > 0
+      ? `\nAVAILABLE GPUs (select ONE from this list):\n${formatGPUsForPrompt(filteredGPUs)}`
+      : ""
+
+    // Estimate FPS based on target resolution and best available GPU
+    const targetRes = answers.targetResolution as '1080p' | '1440p' | '4k'
+    const estimatedFPSRange = selectedGPUTier > 0
+      ? estimateFPS(selectedGPUTier, targetRes)
+      : { low: 0, high: 0 }
+
     // Build the component list for the prompt
     const componentList = componentsToSearch
       .map((c, i) => `${i + 1}. ${c.label}${c.minSpec ? ` - ${c.minSpec}` : ""}`)
@@ -79,6 +146,7 @@ export async function POST(req: Request) {
     const notesJsonTemplate = componentsToSearch
       .map((c) => `    "${c.value}": "why this ${c.label}"`)
       .join(",\n")
+
 
     // Build use-case specific instructions
     let useCaseInstructions = ""
@@ -181,6 +249,13 @@ MANDATORY RULES:
 6. Only leave headroom if it would cause component mismatch.`
     }
 
+    const reusedPartsDisplay = reusedParts.map(type => {
+      const part = identifiedParts[type as ComponentType]
+      return part
+        ? `${type.toUpperCase()} (Model: ${part.name}, Specs: ${part.specs}, Wattage: ${part.wattage}W)`
+        : type.toUpperCase()
+    }).join(", ")
+
     const prompt = `You are a PC component recommendation system. You MUST follow ALL rules below with zero deviation.
 
 ═══════════════════════════════════════════════════════════════
@@ -192,9 +267,11 @@ RULE 1: QUIZ RESULTS ARE AUTHORITATIVE
 - You CANNOT override, reinterpret, or deviate from these inputs.
 - No assumptions. No defaults. No heuristics. Only quiz data.
 
-RULE 2: BUDGET IS A HARD CONSTRAINT
-- Maximum Budget: ₱${budgetPhp.toLocaleString()} PHP
+RULE 2: BUDGET IS A HARD CONSTRAINT [CRITICAL]
+- Maximum Budget: ₱${budgetPhp.toLocaleString()} PHP (exactly ${budgetPhp} as an integer)
 - You MUST NOT exceed this amount under any circumstance.
+- The "totalPrice" field in your JSON response MUST be <= ${budgetPhp}
+- If totalPrice > ${budgetPhp}, the entire response is INVALID and will be rejected.
 - Underspending rules depend on Performance Priority (see below).
 
 RULE 3: NO UNSOLICITED COST SAVINGS
@@ -207,6 +284,11 @@ RULE 4: TRANSPARENCY REQUIRED
 - State any technical limitations preventing optimal selection.
 - No hedging language. Be precise and declarative.
 
+RULE 5: STRICT JSON FORMATTING
+- "price" fields MUST be integers (e.g., 25000).
+- NO strings, NO commas, NO currency symbols (₱, PHP) in JSON numbers.
+- Example: "price": 25000 (CORRECT). "price": "₱25,000" (WRONG).
+
 ═══════════════════════════════════════════════════════════════
 USER'S QUIZ SELECTIONS (BINDING)
 ═══════════════════════════════════════════════════════════════
@@ -217,16 +299,23 @@ PERFORMANCE PRIORITY: ${answers.performancePriority}
 TARGET DISPLAY: ${answers.targetResolution} @ ${answers.refreshRateGoal}
 CPU BRAND: ${answers.brandPreferences.cpu === "any" ? "No preference" : answers.brandPreferences.cpu.toUpperCase()}
 GPU BRAND: ${answers.brandPreferences.gpu === "any" ? "No preference" : answers.brandPreferences.gpu.toUpperCase()}
-${reusedParts.length > 0 ? `REUSING: ${reusedParts.join(", ").toUpperCase()} (EXCLUDE from recommendations)` : ""}
+${reusedParts.length > 0 ? `REUSING: ${reusedPartsDisplay} (EXCLUDE from recommendations)` : ""}
 
 ${useCaseInstructions}
 ${performancePriorityInstructions}
 
 ═══════════════════════════════════════════════════════════════
-COMPONENTS TO RECOMMEND (Philippine Market Prices in PHP)
+COMPONENTS TO RECOMMEND
 ═══════════════════════════════════════════════════════════════
 
 ${componentList}
+${cpuListForPrompt}
+${gpuListForPrompt}
+
+IMPORTANT: For CPU and GPU, you MUST select from the available lists above.
+Use the EXACT name and price from the list. Do not invent components.
+For other components (motherboard, RAM, storage, PSU, case, cooler, monitor),
+use current Philippine market prices and real product names.
 
 ═══════════════════════════════════════════════════════════════
 OUTPUT FORMAT (STRICT JSON - NO MARKDOWN, NO EXPLANATION)
@@ -236,7 +325,7 @@ OUTPUT FORMAT (STRICT JSON - NO MARKDOWN, NO EXPLANATION)
   "components": {
 ${componentJsonTemplate}
   },
-  "totalPrice": 12345,
+  "totalPrice": 12345,  // MUST be <= ${budgetPhp} or response is INVALID
   "reasoning": "Two sentences only. State what was built and how budget was utilized.",
   "notes": {
 ${notesJsonTemplate}
@@ -244,22 +333,59 @@ ${notesJsonTemplate}
 }`
 
     // Use OpenRouter with a FREE model
-    const { text } = await generateText({
-      model: openrouter("google/gemini-2.0-flash-001"),
-      prompt,
-      temperature: 0.3,
-    })
+    const { text } = await withTiming('AI generation', async () => {
+      return generateText({
+        model: openrouter("nvidia/nemotron-nano-9b-v2:free"),
+        prompt,
+        temperature: 0.3,
+      })
+    }, { model: 'nvidia/nemotron-nano-9b-v2:free' })
 
-    // Parse the AI response
+    // Parse the AI response with Zod validation
     const jsonMatch = text.match(/\{[\s\S]*\}/)
     if (!jsonMatch) {
-      throw new Error("Failed to parse AI response")
+      logger.error('Failed to extract JSON from AI response', { response: text.slice(0, 500) })
+      throw new Error("Failed to parse AI response - no JSON found")
     }
 
-    const recommendation = JSON.parse(jsonMatch[0])
+    let recommendation
+    try {
+      const parsed = JSON.parse(jsonMatch[0])
+      recommendation = AIRecommendationSchema.parse(parsed)
+    } catch (parseError) {
+      logger.error('AI response validation failed', {
+        error: parseError instanceof Error ? parseError.message : String(parseError),
+        response: jsonMatch[0].slice(0, 500)
+      })
+      throw new Error("AI response did not match expected schema")
+    }
+
+    // Budget enforcement: Reject builds that exceed the budget
+    const aiTotalPrice = recommendation.totalPrice || 0
+    if (aiTotalPrice > budgetPhp) {
+      const overagePercent = Math.round(((aiTotalPrice - budgetPhp) / budgetPhp) * 100)
+      logger.warn('AI exceeded budget constraint', {
+        budget: budgetPhp,
+        aiTotal: aiTotalPrice,
+        overage: aiTotalPrice - budgetPhp,
+        overagePercent: `${overagePercent}%`
+      })
+
+      // If overage is more than 10%, reject the build
+      if (overagePercent > 10) {
+        return errorResponse(
+          `Build exceeded budget by ${overagePercent}%. Please try again with a higher budget or different preferences.`,
+          400,
+          'BUDGET_EXCEEDED',
+          { budget: budgetPhp, totalPrice: aiTotalPrice, overage: aiTotalPrice - budgetPhp }
+        )
+      }
+      // For small overages (<=10%), log warning but allow it
+      logger.info('Allowing small budget overage', { overagePercent: `${overagePercent}%` })
+    }
 
     // Transform to expected format and add generated shop links
-    const build: Record<ComponentType, { id: string; name: string; type: ComponentType; price: number; specs: string; wattage: number; links: { store: string; url: string }[] }> = {} as any
+    const build = {} as Partial<Record<ComponentType, { id: string; name: string; type: ComponentType; price: number; specs: string; wattage: number; links: { store: string; url: string }[] }>>
 
     componentsToSearch.forEach(({ value: type }) => {
       const comp = recommendation.components[type]
@@ -278,16 +404,67 @@ ${notesJsonTemplate}
       }
     })
 
-    return Response.json({
+    // Inject identified identified reused parts into the build
+    Object.entries(identifiedParts).forEach(([type, component]) => {
+      // Valid type check (mostly for safety)
+      if (reusedParts.includes(type as ComponentType)) {
+        build[type as ComponentType] = {
+          ...component,
+          type: type as ComponentType,
+          id: component.id || `reused-${type}`,
+          links: component.links || [],
+        }
+      }
+    })
+
+    const duration = Math.round(performance.now() - startTime)
+
+    // Calculate total wattage and PSU headroom
+    // Calculate total wattage (excluding PSU itself as it provides power, doesn't consume it like components)
+    const totalWattage = Object.values(build).reduce((sum, c) => {
+      if (c.type === 'psu') return sum
+      return sum + (c?.wattage || 0)
+    }, 0)
+
+    const psuWattage = build.psu?.wattage || 0
+    const psuHeadroom = psuWattage > 0
+      ? Math.round(((psuWattage - totalWattage) / psuWattage) * 100)
+      : 0
+
+    logger.info('Recommendation generated successfully', {
+      duration: `${duration}ms`,
+      componentsCount: Object.keys(build).length,
+      totalPrice: Object.values(build).reduce((sum, c) => sum + (c?.price || 0), 0),
+    })
+
+    return successResponse({
       build,
       reusedParts,
       reasoning: {
         overall: recommendation.reasoning || "AI-generated build recommendation based on current Philippine prices.",
         componentExplanations: recommendation.notes || {},
       },
+      // New metrics for build result header
+      metrics: {
+        estimatedFPS: estimatedFPSRange,
+        psuHeadroom: psuHeadroom,
+        totalWattage: totalWattage,
+        targetResolution: targetRes,
+      },
     })
   } catch (error) {
-    console.error("Recommendation error:", error)
-    return Response.json({ error: "Failed to generate recommendation" }, { status: 500 })
+    const duration = Math.round(performance.now() - startTime)
+
+    // Handle Zod validation errors
+    if (error instanceof ZodError) {
+      logger.warn('Request validation failed', { errors: error.errors, duration: `${duration}ms` })
+      return errorResponse('Invalid request data', 400, 'VALIDATION_ERROR', error.errors)
+    }
+
+    logger.error('Recommendation generation failed', {
+      error: error instanceof Error ? error.message : String(error),
+      duration: `${duration}ms`,
+    })
+    return errorResponse('Failed to generate recommendation', 500)
   }
 }

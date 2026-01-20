@@ -5,7 +5,9 @@ import QuizForm from "./quiz-form"
 import BuildResult from "./build-result"
 import Loader from "./loader"
 import { toast } from "sonner"
+import { logger } from "@/lib/logger"
 import type { QuizAnswers, RecommendationResponse } from "@/lib/types"
+
 
 type AppState = "quiz" | "loading" | "result"
 
@@ -56,9 +58,10 @@ export default function PCPlanner() {
       setRecommendedBuild(data)
       setAppState("result")
     } catch (error) {
-      console.error("Failed to generate build:", error)
+      logger.error("Failed to generate build", { error: error instanceof Error ? error.message : String(error) })
       toast.error("Failed to generate build recommendation after multiple attempts. Please try again.")
       setAppState("quiz")
+
     } finally {
       setRetryCount(0)
     }
@@ -92,6 +95,7 @@ export default function PCPlanner() {
             reusedParts={recommendedBuild.reusedParts || []}
             reasoning={recommendedBuild.reasoning}
             onReset={handleReset}
+            metrics={recommendedBuild.metrics}
           />
         )}
       </div>

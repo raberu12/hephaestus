@@ -1,28 +1,13 @@
-import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { withAuth } from '@/lib/api/with-auth'
+import { successResponse, errorResponse } from '@/lib/api/response'
+import { logger } from '@/lib/logger'
 
 // DELETE: Delete a specific build (owner only)
-export async function DELETE(
-    request: Request,
-    { params }: { params: Promise<{ id: string }> }
-) {
-    const supabase = await createClient()
-    const { id } = await params
+export const DELETE = withAuth(async (request, { user, supabase, params }) => {
+    const id = params?.id
 
-    if (!supabase) {
-        return NextResponse.json(
-            { error: 'Service unavailable' },
-            { status: 503 }
-        )
-    }
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-        return NextResponse.json(
-            { error: 'Unauthorized' },
-            { status: 401 }
-        )
+    if (!id) {
+        return errorResponse('Build ID is required', 400)
     }
 
     // RLS will ensure user can only delete their own builds
@@ -33,38 +18,20 @@ export async function DELETE(
         .eq('user_id', user.id)
 
     if (error) {
-        console.error('Error deleting build:', error)
-        return NextResponse.json(
-            { error: 'Failed to delete build' },
-            { status: 500 }
-        )
+        logger.error('Error deleting build', { userId: user.id, buildId: id, error: error.message })
+        return errorResponse('Failed to delete build', 500)
     }
 
-    return NextResponse.json({ success: true })
-}
+    logger.info('Build deleted', { userId: user.id, buildId: id })
+    return successResponse({ success: true })
+})
 
 // GET: Fetch a specific build
-export async function GET(
-    request: Request,
-    { params }: { params: Promise<{ id: string }> }
-) {
-    const supabase = await createClient()
-    const { id } = await params
+export const GET = withAuth(async (request, { user, supabase, params }) => {
+    const id = params?.id
 
-    if (!supabase) {
-        return NextResponse.json(
-            { error: 'Service unavailable' },
-            { status: 503 }
-        )
-    }
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-        return NextResponse.json(
-            { error: 'Unauthorized' },
-            { status: 401 }
-        )
+    if (!id) {
+        return errorResponse('Build ID is required', 400)
     }
 
     const { data: build, error } = await supabase
@@ -75,11 +42,8 @@ export async function GET(
         .single()
 
     if (error || !build) {
-        return NextResponse.json(
-            { error: 'Build not found' },
-            { status: 404 }
-        )
+        return errorResponse('Build not found', 404)
     }
 
-    return NextResponse.json({ build })
-}
+    return successResponse({ build })
+})

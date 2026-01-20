@@ -18,7 +18,6 @@ export interface PCComponent {
   price: number // Price in PHP from live search
   specs: string
   wattage: number
-  performance?: string
   links?: ShoppingLink[]
 }
 
@@ -37,6 +36,7 @@ export interface QuizAnswers {
     gpu: "any" | "nvidia" | "amd"
   }
   existingParts: ComponentType[]
+  identifiedReusedParts?: Record<string, PCComponent>
 }
 
 // ============================================
@@ -49,10 +49,18 @@ export interface ComponentReasoning {
   tradeOffs?: string
 }
 
+export interface BuildMetrics {
+  estimatedFPS?: { low: number; high: number }
+  psuHeadroom?: number
+  totalWattage?: number
+  targetResolution?: string
+}
+
 export interface RecommendationResponse {
   build: Record<ComponentType, PCComponent>
   reusedParts: ComponentType[]
   reasoning: ComponentReasoning
+  metrics?: BuildMetrics
 }
 
 // ============================================
