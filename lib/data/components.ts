@@ -1,12 +1,33 @@
 import { readFileSync } from 'fs'
 import { join } from 'path'
+import type { ComponentType } from '@/lib/types'
 
 // ============================================
 // Constants
 // ============================================
 
+/**
+ * Approximate USD to PHP exchange rate.
+ * Note: This is a static estimate. Actual rates fluctuate.
+ * Data prices are from July 2025 PCPartPicker.
+ */
 const USD_TO_PHP_RATE = 58
 const DATA_DIR = join(process.cwd(), 'data', 'components')
+
+/**
+ * Default power consumption estimates for components without explicit TDP data.
+ * Values in watts.
+ */
+const DEFAULT_WATTAGES = {
+    motherboard: 50,
+    ram: 5,
+    storage_ssd: 5,
+    storage_hdd: 10,
+    cooler: 10,
+    case: 0,
+    monitor: 30,
+    gpu_fallback: 150,
+} as const
 
 // ============================================
 // Raw Data Types (from JSON)
@@ -408,7 +429,7 @@ export function loadMotherboards(): ProcessedComponent[] {
             priceUSD: mb.price!,
             pricePHP: Math.round(mb.price! * USD_TO_PHP_RATE),
             specs: `${mb.socket}, ${mb.form_factor}, ${mb.memory_slots} slots, max ${mb.max_memory}GB`,
-            wattage: 50, // Typical motherboard power
+            wattage: DEFAULT_WATTAGES.motherboard,
         }))
         .sort((a, b) => a.pricePHP - b.pricePHP)
 }
@@ -426,7 +447,7 @@ export function loadRAM(): ProcessedComponent[] {
                 priceUSD: ram.price!,
                 pricePHP: Math.round(ram.price! * USD_TO_PHP_RATE),
                 specs: `${totalGB}GB (${ram.modules?.[0]}x${ram.modules?.[1]}GB), ${speed}MHz${ram.cas_latency ? `, CL${ram.cas_latency}` : ''}`,
-                wattage: 5, // Typical RAM power
+                wattage: DEFAULT_WATTAGES.ram,
             }
         })
         .sort((a, b) => a.pricePHP - b.pricePHP)
@@ -445,7 +466,7 @@ export function loadStorage(): ProcessedComponent[] {
                 priceUSD: s.price!,
                 pricePHP: Math.round(s.price! * USD_TO_PHP_RATE),
                 specs: `${capacityStr}, ${s.type}, ${s.form_factor}, ${s.interface}`,
-                wattage: s.type === 'SSD' ? 5 : 10, // SSD vs HDD
+                wattage: s.type === 'SSD' ? DEFAULT_WATTAGES.storage_ssd : DEFAULT_WATTAGES.storage_hdd,
             }
         })
         .sort((a, b) => a.pricePHP - b.pricePHP)
@@ -476,7 +497,7 @@ export function loadCases(): ProcessedComponent[] {
             priceUSD: c.price!,
             pricePHP: Math.round(c.price! * USD_TO_PHP_RATE),
             specs: `${c.type}${c.side_panel ? `, ${c.side_panel}` : ''}${c.color ? `, ${c.color}` : ''}`,
-            wattage: 0, // Case has no power draw
+            wattage: DEFAULT_WATTAGES.case,
         }))
         .sort((a, b) => a.pricePHP - b.pricePHP)
 }
@@ -494,7 +515,7 @@ export function loadCoolers(): ProcessedComponent[] {
                 priceUSD: c.price!,
                 pricePHP: Math.round(c.price! * USD_TO_PHP_RATE),
                 specs: [rpmStr, noiseStr, c.color].filter(Boolean).join(', ') || 'CPU Cooler',
-                wattage: 10, // Typical cooler power
+                wattage: DEFAULT_WATTAGES.cooler,
             }
         })
         .sort((a, b) => a.pricePHP - b.pricePHP)
@@ -512,7 +533,7 @@ export function loadMonitors(): ProcessedComponent[] {
                 priceUSD: m.price!,
                 pricePHP: Math.round(m.price! * USD_TO_PHP_RATE),
                 specs: `${m.screen_size}", ${res}, ${m.refresh_rate}Hz, ${m.panel_type}`,
-                wattage: 30, // Typical monitor power
+                wattage: DEFAULT_WATTAGES.monitor,
             }
         })
         .sort((a, b) => a.pricePHP - b.pricePHP)
@@ -521,8 +542,6 @@ export function loadMonitors(): ProcessedComponent[] {
 // ============================================
 // Unified Component Getter (for Part Picker API)
 // ============================================
-
-import type { ComponentType } from '@/lib/types'
 
 export interface PartPickerComponent {
     name: string

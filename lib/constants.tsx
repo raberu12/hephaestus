@@ -18,22 +18,6 @@ export const COMPONENT_ICON_MAP: Record<ComponentType, LucideIcon> = {
 }
 
 /**
- * Icons for each component type (Pre-styled for build results)
- * @deprecated Use COMPONENT_ICON_MAP instead for better flexibility
- */
-export const COMPONENT_ICONS: Record<ComponentType, React.ReactNode> = {
-    cpu: <Cpu className="w-6 h-6 text-primary" />,
-    gpu: <Monitor className="w-6 h-6 text-primary" />,
-    motherboard: <CircuitBoard className="w-6 h-6 text-primary" />,
-    ram: <MemoryStick className="w-6 h-6 text-primary" />,
-    storage: <HardDrive className="w-6 h-6 text-primary" />,
-    psu: <Power className="w-6 h-6 text-primary" />,
-    case: <Box className="w-6 h-6 text-primary" />,
-    cooler: <Fan className="w-6 h-6 text-primary" />,
-    monitor: <Tv className="w-6 h-6 text-primary" />,
-}
-
-/**
  * Format a date string for display
  * @param dateString - ISO date string
  * @param options - Intl.DateTimeFormatOptions for customization
