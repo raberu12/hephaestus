@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { AlertTriangle, RotateCcw } from 'lucide-react'
+import { logger } from '@/lib/logger'
 
 export default function Error({
     error,
@@ -12,8 +13,11 @@ export default function Error({
     reset: () => void
 }) {
     useEffect(() => {
-        // Log the error to console (in production, send to error tracking service)
-        console.error('Application error:', error)
+        logger.error('Application error', {
+            message: error.message,
+            digest: error.digest,
+            stack: error.stack
+        })
     }, [error])
 
     return (
